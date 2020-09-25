@@ -7,6 +7,7 @@
 library(shiny)
 library(shinydashboard)
 library(lubridate)
+library(googleAuthR)
 
 ui <- dashboardPage(
   dashboardHeader(title = "DTG Study Dashboard"),
@@ -16,12 +17,19 @@ ui <- dashboardPage(
                menuSubItem("Screening", tabName = "screening"),
                menuSubItem("Enrollment", tabName = "enrollment")
                ),
-      menuItem("Data QC", tabName = "data_qc",
+      menuItem("Data QC", tabName = "data_qc",icon = icon("th"),
                menuSubItem("QC Reports", tabName = "qc_report")),
-      menuItem("Reports", tabName = "reports",
+      menuItem("Reports", tabName = "reports", icon = icon("th"),
                menuSubItem("Missed Visits", tabName = "missed_visit"),
-               menuSubItem("Withdrawals/Move", tabName = "withdrawal"))
+               menuSubItem("Withdrawals/Move", tabName = "withdrawal")),
+      hr(),
+      " Find Study Id",
+      sidebarSearchForm(textId = "searchText", buttonId = "searchButton",
+                        label = "Enter Study Id..."),
+      uiOutput("logininfo")
     )
   ),
-  dashboardBody()
+  dashboardBody(
+    tabItems()
+  )
 )
