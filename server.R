@@ -10,10 +10,11 @@ library(shinyjs)
 
 # Load data
 usersfilepath <- file.path("data","user_credentials.csv")
-#file_path_county <- file.path("data","covid19_kenya_confirmed_county.csv")
+gauth_detailsfilepath <- file.path("data","google_authentication.csv")
 
 
 df_users <- read.csv(file = usersfilepath, stringsAsFactors = FALSE)
+df_auth <- read.csv(file = gauth_detailsfilepath, stringsAsFactors = FALSE)
 
 
 # guidance og google authentication is availabe here https://lmyint.github.io/post/shiny-app-with-google-login/
@@ -22,18 +23,13 @@ df_users <- read.csv(file = usersfilepath, stringsAsFactors = FALSE)
 # GOOGLE AUTHENTICATION Steps
 # 
 
-# Your Client ID 
-# 915879188103-4kojtu66avgkd5t6v5kijb4ee8r7p4h0.apps.googleusercontent.com
-
-# Your Client Secret
-# zxZ25gE84Rf46QtpRdFOQ0Nl
 
 #Important details for GOOGle authenation
 
 options(googleAuthR.scopes.selected = c("https://www.googleapis.com/auth/userinfo.email",
                                         "https://www.googleapis.com/auth/userinfo.profile"))
-options("googleAuthR.webapp.client_id" = "915879188103-4kojtu66avgkd5t6v5kijb4ee8r7p4h0.apps.googleusercontent.com")
-options("googleAuthR.webapp.client_secret" = "zxZ25gE84Rf46QtpRdFOQ0Nl")
+options("googleAuthR.webapp.client_id" = df_auth[1,'client_id'])
+options("googleAuthR.webapp.client_secret" = df_auth[1,'client_secret'])
 
 
 
@@ -94,6 +90,7 @@ server <- function(input, output, session) {
   accessToken <- callModule(googleAuth, "gauth_login",
                             login_class = "btn btn-primary",
                             logout_class = "btn btn-primary")
+  
   userDetails <- reactive({
     validate(
       need(accessToken(), "not logged in")
@@ -119,12 +116,13 @@ server <- function(input, output, session) {
     }
   })
   
-  user_email = reactive({
+  user_name = reactive({
     userDetails()$name
   })
   
+  ## Display user's Google display name after successful login
   output$logininfo <- renderUI({
-    x <- user_email()
+    x <- user_name()
     HTML('<p>Logged in as <strong>', x,  '</p>')
   })
   
