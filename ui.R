@@ -11,6 +11,8 @@ library(lubridate)
 library(googleAuthR)
 library(plotly)
 
+
+
 ui <- dashboardPage(
   dashboardHeader(title = "DTG Study Dashboard", titleWidth = 250),
   dashboardSidebar(
@@ -19,12 +21,12 @@ ui <- dashboardPage(
                menuSubItem("Enrollment", tabName = "enrollment"),
                menuSubItem("Follow-up", tabName = "follow_up")
                ),
-      menuItem("Data QC", tabName = "data_qc",icon = icon("th"),
+      menuItem("Data QC", tabName = "data_qc",icon = icon("database"),
                menuSubItem("QC Reports", tabName = "qc_report")),
       menuItem("Reports", tabName = "reports", icon = icon("th"),
                menuSubItem("Missed Visits", tabName = "missed_visit"),
                menuSubItem("Withdrawals/Move", tabName = "withdrawal")),
-      menuItem("Downlaod", tabName = "raw_data_download", icon = icon("downlaod")),
+      menuItem("Downlaod", tabName = "raw_data_download", icon = icon("download")),
       hr(),
       " Find Study Id",
       sidebarSearchForm(textId = "searchText", buttonId = "searchButton",

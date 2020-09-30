@@ -11,6 +11,7 @@ library(googleAuthR)
 library(shinyjs)
 library(plotly)
 library(DT)
+library(timevis) # An R package for creating timeline visualizations
 
 # load helper function
 helperfilepath <- file.path("script","helper_functions.R")
@@ -39,6 +40,7 @@ df_all_tables <- list(
 
 # Format columns in the data set
 df_enr$gender <- factor(df_enr$gender, levels = c(0,1), labels = c("Female","Male"))
+df_enr$enrdate_0 <- as.Date(as.character(df_enr$enrdate), format = "%d/%m/%Y")
 
 df_enr <- set_age_group(df_enr, df_scr)
 
@@ -72,6 +74,10 @@ get_user_info <- function(){
 
 server <- function(input, output, session) {
   # For this search form, the corresponding values in the server-side code would be input$searchText and input$searchButton.
+  
+  ## Initialization of variables
+  studyid_select = reactiveVal(NULL)
+  
   
   # This section of the code is adopted from James Peng's authentication and slightly 
   # modified to fit this application
@@ -155,6 +161,7 @@ server <- function(input, output, session) {
   #   HTML('<p>Logged in as <strong>', x,  '</p>')
   # })
   
+   
   
   # -------------------------------------------
   # SCREENING AND ENROLLMENT Details
@@ -259,6 +266,78 @@ server <- function(input, output, session) {
                sprintf("(%s/%s) ",f,f+m),
                "</font><br><br>"))
   })
+  
+  
+  # ------------------------------------------
+  # SHOW MODAL FROM SEARCH BOX
+  # -------------------------------------------
+  
+  observeEvent(input$searchButton,{
+    studyid_select(input$searchText)
+    showModal(patient_details_modal())
+  })
+  
+  
+  # -------------------------------------------
+  # PATIENT DETAILS MODAL DIALOG
+  # -------------------------------------------
+  
+  patient_details_modal <- reactive({
+    if (length(df_enr[which(tolower(df_enr$studyid)  == tolower(studyid_select())),]$studyid) == 0){
+      # Display this page if no matching record
+      modalDialog(
+        # title = "Participant Not Found",
+        fluidPage(
+        
+        HTML(sprintf("<h4>Study ID %s Not Found</h4>",toupper(studyid_select())))
+      ), footer = tagList(actionButton("dismiss_modal",label = "Close")), easyClose = TRUE)
+    } else {
+      # Display the page for displaying details
+      modalDialog(
+        fluidPage(
+          uiOutput("patient_header"),
+          htmlOutput('demographics'),
+          timevisOutput("timeline")
+          
+        ), footer = tagList(actionButton("dismiss_modal",label = "Close")) , size = 'l', easyClose = TRUE
+      )
+      
+    }
+    
+  })
+  
+  # hide the modal page with the patient details
+  observeEvent(input$dismiss_modal, {
+    removeModal()
+  })
+  
+  ## ------------------------------------------
+  ## TIME VISUALIZATION DATA FRAME
+  ##-------------------------------------------
+  df_time_viz_data <- reactive({
+    data <- create_timeline_df(df_enr, studyid_select())
+  })
+  
+  ## ------------------------------------------
+  ## ADD DETAILS TO THE MODAL PAGE
+  ## ------------------------------------------
+  ## Patient Header
+  output$patient_header <- renderUI({
+    h3(strong(sprintf("Patient: %s", toupper(studyid_select()))),align="center")
+  })
+  
+  # Demographic details
+  output$demographics = renderUI({
+    demographics = get_demographic_data(df_enr,df_scr, studyid_select())
+    HTML(demographics)
+  })
+  
+  # Time visualization
+  # create timeline, see helper function below
+  output$timeline = renderTimevis({
+    timevis(df_time_viz_data())
+  })
+  
   # -------------------------------------------
   # DOWNLOAD FOR VARIOUS RAW DATASETS
   # -------------------------------------------
