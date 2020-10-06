@@ -39,7 +39,7 @@ ui <- dashboardPage(
       tabItem(tabName = "enrollment",
               # Screening and Enrollment Numbers
               fluidRow(
-                box(status = 'primary', solidHeader = TRUE, title = 'Screening and Enrolment',
+                box(status = 'primary', solidHeader = TRUE, title = 'Screening and Enrolment Progress',
                     htmlOutput("total_screened"),
                     #uiOutput('screen_progress'),
                     htmlOutput("enroll_progress")
