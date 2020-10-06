@@ -21,7 +21,7 @@ source(helperfilepath)
 usersfilepath <- file.path("data","user_credentials.csv")
 gauth_detailsfilepath <- file.path("data","google_authentication.csv")
 enrollment_filepath <- file.path("data", "enrollment.csv")
-track_filepath <- file.path("data", "track.csv")
+track_filepath <- file.path("data", "tracking.csv")
 withdraw_filepath <- file.path("data", "withdrawal.csv")
 screening_filepath <- file.path("data", "screening.csv")
 followup_filepath <- file.path("data", "followup.csv")
@@ -32,15 +32,25 @@ df_users <- read.csv(file = usersfilepath, stringsAsFactors = FALSE)
 df_auth <- read.csv(file = gauth_detailsfilepath, stringsAsFactors = FALSE)
 df_enr <- read.csv(file = enrollment_filepath, stringsAsFactors = FALSE)
 df_scr <- read.csv(file = screening_filepath, stringsAsFactors = FALSE)
+df_trk <- read.csv(file = track_filepath, stringsAsFactors = FALSE)
+df_withdraw <- read.csv(file = withdraw_filepath, stringsAsFactors = FALSE)
+df_followup <- read.csv(file = followup_filepath, stringsAsFactors = FALSE)
 
 df_all_tables <- list(
   "enrollment" = df_enr,
-  "screening"  = df_scr
+  "screening"  = df_scr,
+  "tracking" = df_trk,
+  "withdrawal" = df_withdraw,
+  "followup" = df_followup
 )
 
 # Format columns in the data set
 df_enr$gender <- factor(df_enr$gender, levels = c(0,1), labels = c("Female","Male"))
 df_enr$enrdate_0 <- as.Date(as.character(df_enr$enrdate), format = "%d/%m/%Y")
+df_withdraw$tdate_0 <- as.Date(as.character(df_withdraw$tdate), format = "%d/%m/%Y")
+df_trk$tdate_0 <- as.Date(as.character(df_trk$tdate), format = "%d/%m/%Y")
+df_followup$vdate_0 <- as.Date(as.character(df_followup$vdate), format = "%d/%m/%Y")
+df_scr$screendate_0 <- as.Date(as.character(df_scr$screendate), format = "%d/%m/%Y")
 
 df_enr <- set_age_group(df_enr, df_scr)
 
@@ -297,7 +307,9 @@ server <- function(input, output, session) {
         fluidPage(
           uiOutput("patient_header"),
           htmlOutput('demographics'),
-          timevisOutput("timeline")
+          timevisOutput("timeline"),
+          htmlOutput("select_visit"),
+          htmlOutput('visit_details')
           
         ), footer = tagList(actionButton("dismiss_modal",label = "Close")) , size = 'l', easyClose = TRUE
       )
@@ -314,8 +326,9 @@ server <- function(input, output, session) {
   ## ------------------------------------------
   ## TIME VISUALIZATION DATA FRAME
   ##-------------------------------------------
-  df_time_viz_data <- reactive({
-    data <- create_timeline_df(df_enr, studyid_select())
+  df_timeline_viz_data <- reactive({
+    data <- create_timeline_df(df_scr, df_enr, df_followup, df_withdraw, df_trk, studyid_select())
+    #print(data)
   })
   
   ## ------------------------------------------
@@ -328,14 +341,139 @@ server <- function(input, output, session) {
   
   # Demographic details
   output$demographics = renderUI({
-    demographics = get_demographic_data(df_enr,df_scr, studyid_select())
-    HTML(demographics)
+    demographics = get_demographic_data(df_enr, studyid_select())
+    #print(demographics)
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(demographics[[1]])),
+      column(6, HTML(demographics[[2]]))
+    ))
   })
   
   # Time visualization
   # create timeline, see helper function below
   output$timeline = renderTimevis({
-    timevis(df_time_viz_data())
+    #print(df_timeline_viz_data())
+    timevis(df_timeline_viz_data())
+  })
+  
+  # VISITS LIST
+  output$select_visit <- renderUI({
+    tvisit_list <- create_visit_list(df_timeline_viz_data())
+    selectInput('visit_list', label = "Select Visit", choices = tvisit_list$choices)
+  })
+  
+  observe({
+    setSelection('timeline', input$visit_list)
+  }) 
+  
+  observe({
+    updateSelectInput(session, 'visit_list', selected= as.numeric(input$timeline_selected))
+  })
+  
+  # select date on timeline
+  selected_date = reactive({
+    as.Date(df_timeline_viz_data()[df_timeline_viz_data()$id ==input$visit_list,]$start)
+  })
+  
+  # -----------------------------------------------------------------
+  # GENERATES VISIT DETAILS BASED ON DATE SELECTED AND TYPE OF VISIT
+  # -----------------------------------------------------------------
+  output$visit_details <- renderUI({
+    row_id = as.integer(input$visit_list)
+    # print(paste("This is what has been selected", row_id))
+    df_selected_item <- df_timeline_viz_data()[df_timeline_viz_data()$id == row_id,]
+      #filter()
+    # print(df_selected_item)
+    if(nrow(df_selected_item)>0) {
+      if(grepl("Enrollment", df_selected_item$content)) {
+        #print(paste("Enrollment selected", row_id))
+        
+        details_header <- sprintf("<h4>Enrollment Visit Details: %s </h4>",format(selected_date(), format = '%Y-%B-%d'))
+        
+        fluidRow(
+          column(12, HTML(details_header),
+                 tabsetPanel(id = 'tabs', type = 'tabs',
+                             tabPanel('Hiv History and Symptoms', htmlOutput('hiv_history')),
+                             tabPanel('ART Adherence and Medical History', htmlOutput('art_meds')),
+                             tabPanel('Food Security', htmlOutput('food_security')),
+                             tabPanel('Reproductive History', htmlOutput('rep_history')),
+                             tabPanel('Baseline Data', htmlOutput('baseline')),
+                             selected = input$tabs
+                             )
+                 )
+        )
+      } else if(grepl("Screening", df_selected_item$content)) {
+        print(paste("Screening selected", row_id))
+      } else if(grepl("Followup", df_selected_item$content)) {
+        print(paste("Followup selected", row_id))
+        
+       
+        
+      } else if(grepl("Withdrawal", df_selected_item$content)) {
+        print(paste("Withdrawal selected", row_id))
+        
+        fluidRow(column(12, HTML(sprintf('<h4>Withdrawal: %s</h4>', format(selected_date(), format = '%Y-%B-%d')))),
+                 column(12, htmlOutput('withdrawal_details')))
+        
+      } else if(grepl("Tracking", df_selected_item$content)) {
+        print(paste("Tracking selected", row_id))
+        fluidRow(column(12, HTML(sprintf('<h4>Tracking: %s</h4>', format(selected_date(), format = '%Y-%B-%d')))),
+                 column(12, htmlOutput('tracking_details')))
+        
+      } else if(grepl("Moved", df_selected_item$content)) {
+        print(paste("Move out selected", row_id))
+        
+        fluidRow(column(12, HTML(sprintf('<h4>Participant Moved: %s</h4>', format(selected_date(), format = '%Y-%B-%d')))),
+                 column(12, htmlOutput('move_out_details')))
+      }
+      
+    }
+    
+  })
+  
+  # -----------------------------------------------
+  # CREATE HTML OUTPUTS FOR VARIOUS VISIT DETAILS OR TABS
+  # -----------------------------------------------
+  output$hiv_history <- renderUI({
+  hivhistory <- get_hiv_history(df_enr, studyid_select())
+  HTML(hivhistory)
+  })
+  
+  output$art_meds <- renderUI({
+    meds_history <- get_medication_history(df_enr, studyid_select())
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(4, HTML(meds_history[[1]])),
+      column(4, HTML(meds_history[[2]])),
+      column(4, HTML(meds_history[[3]]))
+      ))
+  })
+  
+  
+  output$food_security <- renderUI({
+    food_details <- get_food_security(df_enr, studyid_select())
+    
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(food_details[[1]])),
+      column(6, HTML(food_details[[2]]))
+    ))
+  })
+  
+  output$rep_history <- renderUI({
+    reproductive_history <- get_reproductive_history(df_enr, studyid_select())
+    HTML(reproductive_history)
+  })
+  
+  output$baseline <- renderUI({
+    baseline_info <- get_enrollment_details(df_enr, studyid_select())
+    
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(baseline_info[[1]])),
+      column(6, HTML(baseline_info[[2]]))
+    ))
   })
   
   # -------------------------------------------
