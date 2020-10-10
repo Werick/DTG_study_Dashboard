@@ -39,6 +39,20 @@ ui <- dashboardPage(
       tabItem(tabName = "enrollment",
               # Screening and Enrollment Numbers
               fluidRow(
+                # Dynamic valueBoxes
+                valueBoxOutput("screened"),
+                
+                valueBoxOutput("enrolled"),
+                valueBoxOutput("male")
+              ),
+              fluidRow(
+                # Dynamic valueBoxes
+                valueBoxOutput("hypertensive"),
+                
+                valueBoxOutput("diabetic"),
+                valueBoxOutput("cholestrol")
+              ),
+              fluidRow(
                 box(status = 'primary', solidHeader = TRUE, title = 'Screening and Enrolment Progress',
                     htmlOutput("total_screened"),
                     #uiOutput('screen_progress'),
@@ -73,6 +87,9 @@ ui <- dashboardPage(
                     ),
                 box(status = "primary", solidHeader = TRUE, title = "Download raw Enrollment Data",
                     downloadButton("download_enrollment", label = "Download Enrollment csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Download raw Tracking Data",
+                    downloadButton("download_tracking", label = "Download Tracking csv")
                 )
               ),
               fluidRow(

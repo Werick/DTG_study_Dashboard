@@ -1,6 +1,17 @@
 ## Helper Functions
 library(dplyr)
 
+
+get_age_group <- function(df) {
+  age <- as.integer(df['age']) 
+  
+  grp <- ifelse(age<=34,1,
+                ifelse(age>34 & age<=44,2,
+                       ifelse(age>=45 & age <=54,3,
+                              ifelse(age>=55 & age<=64,4,5))))
+  return(grp)
+}
+
 # -------------------------------------------
 # GENERATE AGE GROUP
 # -------------------------------------------
@@ -14,11 +25,7 @@ set_age_group <- function(df_enr, df_scr) {
   
   df_enr$age <- as.integer(df_enr$age)
   
-  df_enr <- df_enr %>%
-    mutate(age_group = ifelse(age<=34,1,
-                              ifelse(age>34 & age<=44,2,
-                                     ifelse(age>=45 & age <=54,3,
-                                            age>=55 & age<=64,4,5))))
+  df_enr$age_group = apply(df_enr,1,get_age_group)
   
   df_enr$age_group <- factor(df_enr$age_group, levels = c(1,2,3,4,5),
                              labels = c("25-34","35-44","45-54","55-64","65+"))
@@ -84,7 +91,7 @@ get_enrollment_details <- function(df_enr, study_id) {
     <b>Blood pressure Reading 2</b> : %s / %s <br>
     <b>Blood pressure Reading 3</b> : %s / %s <br>
     <b> Date scheduled Next Visit </b> : %s <br>
-                            ", weight, height, bp_systolic_1,bp_diastolic_1,bp_systolic_2,bp_diastolic_2,
+                            ", height,weight , bp_systolic_1,bp_diastolic_1,bp_systolic_2,bp_diastolic_2,
                             bp_systolic_3,bp_diastolic_3,tca_fasting_labs)
   
   

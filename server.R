@@ -172,6 +172,65 @@ server <- function(input, output, session) {
   # })
   
    
+   output$screened <- renderValueBox({
+     valueBox(
+       paste0(length(screening_data()$studyid)), "Number Screened", icon = icon("list"),
+       color = "aqua"
+     )
+   })
+   
+   output$enrolled <- renderValueBox({
+     valueBox(
+       paste0(length(enrollment_data()$studyid)), "Number Enrolled", icon = icon("thumbs-up", lib = "glyphicon"),
+       color = "green"
+     )
+   })
+   
+  
+   output$male <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$gender=="Male",]$studyid)
+     t<-length(enrollment_data()$studyid)
+     result <- 100*m/t
+     valueBox(
+       
+       paste0(result,"%","(",m,"/",t,")"), "Proportion of Male Enrolled", icon = icon("male", lib = "glyphicon"),
+       color = "aqua"
+     )
+   })
+   
+   output$hypertensive <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$ever_had_hyp==1,]$studyid)
+     t<-length(enrollment_data()$studyid)
+     result <- 100*m/t
+     valueBox(
+       
+       paste0(result,"%","(",m,"/",t,")"), "Proportion Hypertensive", icon = icon("male", lib = "glyphicon"),
+       color = "green"
+     )
+   })
+   
+   output$diabetic <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$ever_had_diab==1,]$studyid)
+     t<-length(enrollment_data()$studyid)
+     result <- 100*m/t
+     valueBox(
+       
+       paste0(result,"%","(",m,"/",t,")"), "Proportion Diabetic", icon = icon("male", lib = "glyphicon"),
+       color = "aqua"
+     )
+   })
+   
+   output$cholestrol <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$ever_had_chol==1,]$studyid)
+     t<-length(enrollment_data()$studyid)
+     result <- 100*m/t
+     valueBox(
+       
+       paste0(result,"%","(",m,"/",t,")"), "Proportion With High Cholestrol", icon = icon("male", lib = "glyphicon"),
+       color = "green"
+     )
+   })
+   
   
   # -------------------------------------------
   # SCREENING AND ENROLLMENT Details
@@ -500,6 +559,36 @@ server <- function(input, output, session) {
     },
     content = function(con) {
       write.csv(df_all_tables$enrollment, con)
+    }
+  )
+  
+  # followup
+  output$download_fup <- downloadHandler(
+    filename = function() {
+      paste('followup-', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(df_all_tables$followup, con)
+    }
+  )
+  
+  # Tracking
+  output$download_tracking <- downloadHandler(
+    filename = function() {
+      paste('tracking-', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(df_all_tables$tracking, con)
+    }
+  )
+  
+  # enrollent
+  output$download_withdrawal <- downloadHandler(
+    filename = function() {
+      paste('withdraw_move-', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(df_all_tables$withdrawal, con)
     }
   )
   
