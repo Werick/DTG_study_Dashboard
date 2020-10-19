@@ -31,19 +31,21 @@ ui <- dashboardPage(
       " Find Study Id",
       sidebarSearchForm(textId = "searchText", buttonId = "searchButton",
                         label = "Enter Study Id..."),
-      uiOutput("logininfo")
+      uiOutput("logininfo"),
+      uiOutput("last_updated")
     )
   ),
   dashboardBody(
     tabItems(
       tabItem(tabName = "enrollment",
+              h2("Enrollment Summary"),
               # Screening and Enrollment Numbers
               fluidRow(
                 # Dynamic valueBoxes
-                valueBoxOutput("screened"),
-                
+                #valueBoxOutput("screened"),
                 valueBoxOutput("enrolled"),
-                valueBoxOutput("male")
+                valueBoxOutput("male"),
+                valueBoxOutput("bmi")
               ),
               fluidRow(
                 # Dynamic valueBoxes
@@ -53,18 +55,17 @@ ui <- dashboardPage(
                 valueBoxOutput("cholestrol")
               ),
               fluidRow(
-                box(status = 'primary', solidHeader = TRUE, title = 'Screening and Enrolment Progress',
-                    htmlOutput("total_screened"),
-                    #uiOutput('screen_progress'),
-                    htmlOutput("enroll_progress")
-                    ),
+                
                 box(status = 'primary', solidHeader = TRUE,title = 'Breakdowns',
                     selectInput("breakdown", label = "Breakdown: ",
-                                choices = c('None','Gender', 'Age-group')),
+                                choices = c('All','Gender', 'Age-group','Pre-conditions'))
+                ),
+                box(status = 'primary', solidHeader = TRUE,title = 'Sub-Breakdowns',
                     selectInput("subcategory", label = "Sub Category: ",
-                                choices = c('None'))
-                    #htmlOutput("enroll_progress"))
-              )
+                                choices = c('All'))
+                    
+                )
+                
               ),
               fluidRow(
                 box(title="Enrollment Summary by Gender", 
@@ -77,6 +78,37 @@ ui <- dashboardPage(
                     div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
                     downloadButton("download1","Download csv")
                 )
+              )
+              ),
+      tabItem(tabName = "follow_up", 
+              # Add variours value boxes to show follow-up visit status
+              h2("Follow-up Visits Summary"),
+              fluidRow(
+                # Dynamic valueBoxes
+                valueBoxOutput("month_1"),
+                
+                valueBoxOutput("month_3"),
+                valueBoxOutput("month_6")
+              ),
+              fluidRow(
+                # Dynamic valueBoxes
+                valueBoxOutput("new_hypertenstion"),
+                
+                valueBoxOutput("new_diabetic"),
+                valueBoxOutput("new_cholestrol")
+              ),
+              fluidRow(
+                
+                box(status = 'primary', solidHeader = TRUE,title = 'Follow-up Visits',
+                    selectInput("fu_visits", label = "Breakdown: ",
+                                choices = c('All','Month 1', 'Month 3','Month 6'))
+                ),
+                box(status = 'primary', solidHeader = TRUE,title = 'Incidence',
+                    selectInput("fu_incidence", label = "Sub Category: ",
+                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Obesity'))
+                    
+                )
+                
               )
               ),
       tabItem(tabName = "raw_data_download",
