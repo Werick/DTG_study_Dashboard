@@ -12,6 +12,7 @@ library(shinyjs)
 library(plotly)
 library(DT)
 library(timevis) # An R package for creating timeline visualizations
+library(lubridate)
 
 # load helper function
 helperfilepath <- file.path("script","helper_functions.R")
@@ -54,6 +55,8 @@ df_scr$screendate_0 <- as.Date(as.character(df_scr$screendate), format = "%d/%m/
 
 df_enr <- set_age_group(df_enr, df_scr)
 
+df_enr$bmi <- apply(df_enr, 1, calculate_bmi)
+
 
 # guidance og google authentication is availabe here https://lmyint.github.io/post/shiny-app-with-google-login/
 # and https://gist.github.com/explodecomputer/ef4341872582719d6b73
@@ -83,6 +86,17 @@ get_user_info <- function(){
 
 
 server <- function(input, output, session) {
+  
+  # get the time when the file was last modified
+  date_last_updates <- reactive({
+    #print(as.character(file.info(followup_filepath)$mtime))
+    as.character(file.info(followup_filepath)$mtime) # Get time when the file was last modified
+  })
+  
+  output$last_updated <- renderUI({
+       HTML('<p>Date Last Updated: <strong>', date_last_updates(),  '</p>')
+     })
+  
   # For this search form, the corresponding values in the server-side code would be input$searchText and input$searchButton.
   
   ## Initialization of variables
@@ -171,7 +185,9 @@ server <- function(input, output, session) {
   #   HTML('<p>Logged in as <strong>', x,  '</p>')
   # })
   
-   
+  # -------------------------------------------
+  # VALUE BOXES ON THE MAIN/ENROLLMENT TAB
+  # -------------------------------------------   
    output$screened <- renderValueBox({
      valueBox(
        paste0(length(screening_data()$studyid)), "Number Screened", icon = icon("list"),
@@ -180,8 +196,11 @@ server <- function(input, output, session) {
    })
    
    output$enrolled <- renderValueBox({
+     e <- length(enrollment_data()$studyid)
+     s <- length(screening_data()$studyid)
+     result <- round(100*e/s,1)
      valueBox(
-       paste0(length(enrollment_data()$studyid)), "Number Enrolled", icon = icon("thumbs-up", lib = "glyphicon"),
+       paste0(result,"%","(",e,"/",s,")"), "Proportion Enrolled", icon = icon("thumbs-up", lib = "glyphicon"),
        color = "green"
      )
    })
@@ -226,11 +245,62 @@ server <- function(input, output, session) {
      result <- 100*m/t
      valueBox(
        
-       paste0(result,"%","(",m,"/",t,")"), "Proportion With High Cholestrol", icon = icon("male", lib = "glyphicon"),
+       paste0(result,"%","(",m,"/",t,")"), "Proportion with High Cholestrol", icon = icon("male", lib = "glyphicon"),
        color = "green"
      )
    })
    
+   output$bmi <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$bmi>=30.0,]$studyid)
+     t<-length(enrollment_data()$studyid)
+     result <- 100*m/t
+     valueBox(
+       
+       paste0(result,"%","(",m,"/",t,")"), "Proportion with Obesity",
+       color = "green"
+     )
+   })
+   
+   
+   # -------------------------------------------
+   # VALUE BOXES ON THE Follow-up TAB
+   # -------------------------------------------
+   follow_up_data <- reactive({
+     ret_val <- df_followup
+   })
+   
+   output$month_1 <- renderValueBox({
+     t<-length(enrollment_data()$studyid)
+     n <- length(follow_up_data()[follow_up_data()$fuvnumber==1,]$studyid)
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "Proportion seen for Month 1 follow-up Visit",
+       color = "green"
+     )
+   })
+   
+   output$month_3 <- renderValueBox({
+     t<-length(enrollment_data()$studyid)
+     n <- length(follow_up_data()[follow_up_data()$fuvnumber==3,]$studyid)
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "Proportion seen for Month 3 follow-up Visit",
+       color = "green"
+     )
+   })
+   
+   output$month_6 <- renderValueBox({
+     t<-length(enrollment_data()$studyid)
+     n <- length(follow_up_data()[follow_up_data()$fuvnumber==6,]$studyid)
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "Proportion seen for Month 6 follow-up Visit",
+       color = "green"
+     )
+   })
   
   # -------------------------------------------
   # SCREENING AND ENROLLMENT Details
@@ -273,25 +343,66 @@ server <- function(input, output, session) {
   
   ## Check the user selection of breakdown input and update the subcategory
   observeEvent(input$breakdown, {
-    pref_choices <- c("Male", "Female")
+    pref_choices <- c()
+    select_label <- ""
     selected_option <- input$breakdown
     if(selected_option == "Gender") {
-      updateSelectInput(session, "subcategory",
-                        label = "Select Gender",
-                        choices = pref_choices,
-                        selected = head(pref_choices, 1))
+      pref_choices <- c("All","Male", "Female")
+      select_label <- "Select Gender"
     } else if (selected_option == "Age-group") {
-      pref_choices <- c("25-34", "35-44", "45-54", "55-64", "65+")
-      updateSelectInput(session, "subcategory",
-                        label = "Select Age Group",
-                        choices = pref_choices,
-                        selected = head(pref_choices, 1))
+      pref_choices <- c("All","25-34", "35-44", "45-54", "55-64", "65+")
+      select_label <- "Select Age Group"
+    } else if (selected_option == "Pre-conditions"){
+      pref_choices <- c("All","Hypertensive", "Diabetic", "Cholestrol", "Obesity")
+      select_label <- "Select Pre-Existing Conditions"
+    }else {
+      pref_choices <- c("All")
+      select_label <- ""
     }
+    
+    updateSelectInput(session, "subcategory",
+                      label = select_label,
+                      choices = pref_choices,
+                      selected = head(pref_choices, 1))
   })
+  
   
   ## Enrollment graph by Gender/sex
   output$plot1_enrollment <- renderPlotly({
-    p<-ggplot(df_enr, aes(x=gender,fill=gender)) +
+    df <- df_enr #get_dashboard_data(df_enr, input$breakdown,input$subcategory)
+    
+    if( input$breakdown == "Gender") {
+      if(input$subcategory != "All") {
+        df <- df_enr %>%
+          filter(gender == input$subcategory)
+      }
+      
+    } else if (input$breakdown == "Age-group") {
+      if( input$subcategory != "All") {
+        df <- df_enr %>%
+          filter(age_group == input$subcategory)
+      }
+      
+    } else if (input$breakdown == "Pre-conditions") {
+      if(input$subcategory == "Hypertensive") {
+        df <- df_enr %>%
+          filter(ever_had_hyp == 1)
+      } else if(input$subcategory == "Diabetic") {
+        df <- df_enr %>%
+          filter(ever_had_diab == 1)
+      } else if(input$subcategory == "Cholestrol") {
+        df <- df_enr %>%
+          filter(ever_had_chol == 1)
+      } else if(input$subcategory == "Obesity") {
+        df <- df_enr %>%
+          filter(bmi >= 30.0)
+      } 
+    }
+    
+      
+      
+    
+    p<-ggplot(df, aes(x=gender,fill=gender)) +
       xlab("") +
       geom_bar(stat = "count") +
       theme_minimal()
@@ -301,11 +412,41 @@ server <- function(input, output, session) {
   # Add downloadable list
   df_temp <- reactive({
     ret_value <- enrollment_data() %>%
-      select(studyid, clinicid,pinitials,gender,enrdate,dtg_start_date, year_diagnosed,year_start_art, age,height,weight,age_group)
+      select(studyid, clinicid,pinitials,gender,enrdate,dtg_start_date, year_diagnosed,year_start_art, age,height,weight,age_group,
+             bmi, ever_had_hyp,ever_had_diab,ever_had_chol)
     
   })
   output$enrollment_list <- DT::renderDataTable({
-   dt <- df_temp()
+   dt <- df_temp() #get_dashboard_data(df_temp(), input$breakdown,input$subcategory)
+   
+   if( input$breakdown == "Gender") {
+     if(input$subcategory != "All") {
+       dt <- df_temp() %>%
+         filter(gender == input$subcategory)
+     }
+     
+   } else if (input$breakdown == "Age-group") {
+     if( input$subcategory != "All") {
+       dt <- df_temp() %>%
+         filter(age_group == input$subcategory)
+     }
+     
+   } else if (input$breakdown == "Pre-conditions") {
+     if(input$subcategory == "Hypertensive") {
+       dt <- df_temp() %>%
+         filter(ever_had_hyp == 1)
+     } else if(input$subcategory == "Diabetic") {
+       dt <- df_temp() %>%
+         filter(ever_had_diab == 1)
+     } else if(input$subcategory == "Cholestrol") {
+       dt <- df_temp() %>%
+         filter(ever_had_chol == 1)
+     } else if(input$subcategory == "Obesity") {
+       dt <- df_temp() %>%
+         filter(bmi >= 30.0)
+     } 
+   }
+   
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download1'));"),
