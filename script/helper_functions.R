@@ -13,6 +13,20 @@ get_age_group <- function(df) {
 }
 
 # -------------------------------------------
+# CALCULATE BMI
+# -------------------------------------------
+calculate_bmi <- function(df) {
+  weight <- as.integer(df['weight'])
+  height <- as.integer(df['height'])
+  
+  height_in_m <- height/100
+  bmi <- weight/(height_in_m*height_in_m)
+  return(round(bmi,1))
+  
+}
+
+
+# -------------------------------------------
 # GENERATE AGE GROUP
 # -------------------------------------------
 set_age_group <- function(df_enr, df_scr) {
@@ -393,4 +407,25 @@ create_visit_list <- function(df_timeline) {
   
   return(list("choices" = choices))
   
+}
+
+# --------------------------------------------------------------------
+# GENERATE DATASET TO SELECT DATA TO BE DISPLAYED IN ON MAIN DASHBOARD
+# --------------------------------------------------------------------
+get_dashboard_data <- function(df, main_breakdown, sub_breakdown) {
+  dt <- df
+  if( main_breakdown == "Gender") {
+    if(sub_breakdown != "All") {
+      dt <- df %>%
+        filter(gender == sub_breakdown)
+    }
+    
+  } else if (main_breakdown == "Age-group") {
+    if( sub_breakdown != "All") {
+      dt <- df %>%
+        filter(age_group == sub_breakdown)
+    }
+    
+  }
+  return(dt)
 }
