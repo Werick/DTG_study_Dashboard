@@ -25,6 +25,16 @@ calculate_bmi <- function(df) {
   
 }
 
+calculate_bmi_fu <- function(df_fu, df_en) {
+  weight <- as.integer(df_fu['weight'])
+  height <- as.integer(df_en[df_en$studyid == df_fu['studyid'], 'height'])
+  
+  height_in_m <- height/100
+  bmi <- weight/(height_in_m*height_in_m)
+  return(round(bmi,1))
+  
+}
+
 
 # -------------------------------------------
 # GENERATE AGE GROUP
@@ -130,9 +140,60 @@ get_enrollment_details <- function(df_enr, study_id) {
   return(c(return_string1,return_string2))
 }
 
+
 # -------------------------------------------
+# FOLLOW-UP VISIT INFORMATION
+# -------------------------------------------
+
+get_followup_details <- function(df, study_id, selected_date) {
+  df_selected_enr <- df %>%
+    filter(toupper(studyid)  == toupper(study_id), as.Date(as.character(vdate))==as.Date(as.character(selected_date)) )
+  
+  weight <- df_selected_enr$weight
+  bp_systolic_1 <- as.character(df_selected_enr$bp_systolic_1)
+  bp_diastolic_1 <- as.character(df_selected_enr$bp_diastolic_1)
+  bp_systolic_2 <- ifelse(df_selected_enr$bp_systolic_2 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_systolic_2))
+  bp_diastolic_2 <- ifelse(df_selected_enr$bp_diastolic_2 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_2))
+  bp_systolic_3 <- ifelse(df_selected_enr$bp_systolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_systolic_3))
+  bp_diastolic_3 <- ifelse(df_selected_enr$bp_diastolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_3))
+  tca_fasting_labs <- ifelse(df_selected_enr$tca_fasting_labs== "01/01/2000", as.character(df_selected_enr$next_visit_date), as.character(df_selected_enr$tca_fasting_labs))
+  
+  return_string1 <- sprintf("
+    <u><b>Vitals</b> </u> <br>
+    <b>Weight (kg)</b> : %s <br>
+    <b>Blood pressure Reading 1</b> : %s / %s <br>
+    <b>Blood pressure Reading 2</b> : %s / %s <br>
+    <b>Blood pressure Reading 3</b> : %s / %s <br>
+    <b> Date scheduled Next Visit </b> : %s <br>
+                            ",weight , bp_systolic_1,bp_diastolic_1,bp_systolic_2,bp_diastolic_2,
+                            bp_systolic_3,bp_diastolic_3,tca_fasting_labs)
+  
+  
+  fasting <- ifelse(df_selected_enr$fasting == 1, "Yes", "No")
+  f_glucose <- ifelse(df_selected_enr$fasting == 1, as.character(df_selected_enr$f_glucose), "N/A")
+  f_total_chol <- ifelse(df_selected_enr$fasting == 1, as.character(df_selected_enr$f_total_chol), "N/A")
+  f_hdl_chol <- ifelse(df_selected_enr$fasting == 1, as.character(df_selected_enr$f_hdl_chol), "N/A")
+  f_trig <- ifelse(df_selected_enr$fasting == 1, as.character(df_selected_enr$f_trig), "N/A")
+  hgb <- ifelse(df_selected_enr$hgb %in% c(-9,-6), "Not Done",as.character(df_selected_enr$hgb))
+  
+  return_string2 <- sprintf("
+    <u><b>Fasting Labs</b> </u> <br>
+    <b>Is participant fasting?</b> : %s <br>
+    <b>Fasting glucose (mmol/L)</b> : %s <br>
+    <b>Fasting total cholesterol (mmol/L)</b> : %s <br>
+    <b>Fasting HDL cholesterol (mmol/L)</b> : %s <br>
+    <b>Fasting Triglycerides (mmol/L)</b> : %s <br>
+    <b>Hgb A1c (&#37;)</b> : %s <br>
+                            ", fasting, f_glucose, f_total_chol,f_hdl_chol,f_trig,hgb)
+  
+  
+  return(c(return_string1,return_string2))
+}
+
+
+# -----------------------------------------------------
 # ART AND MEDICATION HISTORY INFORMATION AT ENROLLMENT
-# -------------------------------------------
+# -----------------------------------------------------
 
 get_hiv_history <- function(df_enr, study_id) {
   
@@ -167,6 +228,38 @@ get_hiv_history <- function(df_enr, study_id) {
     ", hiv_year, art_year, stopped_meds, duration_stopped, weight_change, symptoms
   ))
 }
+
+
+get_fu_sysmptom_n_art_adherence <- function(df, study_id, selected_date) {
+  
+  df_select_enr <- df %>%
+    filter(toupper(studyid)  == toupper(study_id), as.Date(as.character(vdate))== as.Date(as.character(selected_date)) )
+  
+  visit_number <- df_select_enr$fuvnumber
+  duration_missed <- df_select_enr$days_missed_meds
+  weight_change <- ifelse(df_select_enr$weight_change == 0,"No Change",
+                          ifelse(df_select_enr$weight_change == 1, "I think I lost weight","I think I gained weight"))
+  symp_thirsty <- ifelse(df_select_enr$symp_thirsty == 1, "I felt more thirsty than usual", "")
+  symp_drink_water <- ifelse(df_select_enr$symp_drink_water == 1, "I needed to drink much more water than usual", "")
+  symp_urinate <- ifelse(df_select_enr$symp_urinate == 1, "I noticed I was urinating much more frequently or a larger amount than usual", "")
+  symp_none <- ifelse(df_select_enr$symp_none == 1, "Yes", "No")
+  symptoms <- "None"
+  
+  if (symp_none == "No") {
+    symptoms <- paste(symp_thirsty,symp_drink_water,symp_urinate,sep = ";")
+  }
+  
+  return(sprintf(
+    "<b>Follow-up Visit Number</b> : Month %s  <br>
+    <u><b>ART Adherence</b></u> <br>
+    <b>Over the past 7 days, how many days have you missed taking your HIV medications?</b>: %s <br>
+    <u><b>Symptoms</b></u> <br>
+    <b>Any weight changes in the past month</b>: %s <br>
+    <b>Symptoms experienced in the past month</b>: %s <br>
+    ",visit_number, duration_missed, weight_change, symptoms
+  ))
+}
+
 
 get_medication_history <- function(df_enr, study_id) {
   df_select_enr <- df_enr %>%
@@ -212,12 +305,21 @@ get_medication_history <- function(df_enr, study_id) {
 }
 
 
-# -------------------------------------------
-# FOOD SECURITY INFORMATION AT ENROLLMENT
-# -------------------------------------------
-get_food_security <- function(df_enr, study_id) {
-  df_selected_enr <- df_enr %>%
-    filter(toupper(studyid)  == toupper(study_id) )
+# --------------------------------------------------
+# FOOD SECURITY INFORMATION AT ENROLLMENT/FOLLOW-UP
+# --------------------------------------------------
+get_food_security <- function(df, study_id, vtype="e", selected_date="2020-10-01") {
+  
+  if (vtype == "f") {
+    df_selected_enr <- df %>%
+      filter(toupper(studyid)  == toupper(study_id), 
+             as.Date(as.character(vdate)) == as.Date(as.character(selected_date)) )
+    
+  } else {
+    df_selected_enr <- df %>%
+      filter(toupper(studyid)  == toupper(study_id) )
+  }
+  
   
   no_enough_food <- ifelse(df_selected_enr$no_enough_food == 1, "Yes", "No")
   no_preferred_food <- ifelse(df_selected_enr$no_preferred_food == 1, "Yes", "No")
@@ -275,6 +377,196 @@ get_reproductive_history <- function(df_enr, study_id) {
   
 }
 
+# ----------------------------------------------------------
+# GENERATES REPRODUCTIVE HISTORY ON A GIVEN FOLLOW-UP VISIT
+# ---------------------------------------------------------
+get_reproductive_history_fu <- function(df, study_id, selected_date) {
+  df_selected_enr <- df %>%
+    filter(toupper(studyid)  == toupper(study_id), as.Date(as.character(vdate))== as.Date(as.character(selected_date)) )
+  
+  return_string <- sprintf("<h3>No Reproductive information for Male gender</h3>")
+  
+  #print(df_selected_enr)
+  if (df_selected_enr$gender == "Female" ) {
+    currently_pregnant <- ifelse(df_selected_enr$currently_pregnant == 1, "Yes", "No")
+    edd <- ifelse(df_selected_enr$edd %in% c("2000-01-01","2018-11-01","01/01/2018","01/01/2000"), "N/A", as.character(df_selected_enr$edd))
+    use_fp <- ifelse(df_selected_enr$use_fp == 1, "Yes", "No")
+    fp_method <-  ifelse(df_selected_enr$fp_method == 8, df_selected_enr$other_fp_method,
+                         ifelse(df_selected_enr$fp_method==-9,"N/A",df_selected_enr$fp_method)) 
+    
+    
+    return_string <- sprintf("
+        <b>Currently Pregnantly?</b> : %s <br>
+        <b>Expected Date of Delivery</b> : %s <br>
+        <b>Currently using contraception (e.g. Family Planning)?</b> : %s <br>
+        <b>what kind? If current contraception</b> : %s <br>", 
+                             currently_pregnant,edd,use_fp,fp_method)
+  } 
+  
+  return(return_string)
+  
+}
+
+# --------------------------------------------
+# GET SCREENING INFORMATION
+# --------------------------------------------
+get_screening_info <- function(df, study_id) {
+  # Screening
+  df_sc_filtered = df %>%
+    filter(toupper(studyid) == toupper(study_id))
+  age <- ifelse(df_sc_filtered$agecheck == 1, "Yes", "No")
+  hiv <- ifelse(df_sc_filtered$hiv_pos == 1, "Yes", "No")
+  on_art <- ifelse(df_sc_filtered$art_start_6mo == 1, "Yes", "No")
+  start_dtg_prior <- ifelse(df_sc_filtered$start_dtg_prior == 1, "Yes", "No")
+  start_dtg_today <- ifelse(df_sc_filtered$start_dtg_today == 1, "Yes", "No")
+  sw_art_regimen <- as.character(df_sc_filtered$sw_art_regimen)
+
+  
+  return_string <- sprintf("
+        <b>A1. Age &gt;&#61;25?</b> : %s <br>
+        <b>B1. HIV-positive?</b> : %s <br>
+        <b>B2. On ART for at least 6 months?</b> : %s <br>
+        <b>D1. Was patient switched to DTG today?</b> : %s <br>
+        <b>D2. ART regimen after switch</b> : %s <br>", 
+                           age,hiv,on_art,start_dtg_prior,start_dtg_today,sw_art_regimen)
+  
+  pregnant <- ifelse(df_sc_filtered$pregnant == 1, "Yes", "No")  
+  edd <- ifelse(df_sc_filtered$edd %in% c("2000-01-01","2018-11-01","01/01/2018","01/01/2000"), "N/A", as.character(df_sc_filtered$edd))
+  use_fp <- ifelse(df_sc_filtered$use_fp == 1, "Yes", "No")
+  fp_method <-  ifelse(df_sc_filtered$fp_method == 8, df_sc_filtered$other_fp_method,
+                       ifelse(df_sc_filtered$fp_method==-9,"N/A",df_sc_filtered$fp_method)) 
+  
+  eligible <- ifelse(df_sc_filtered$eligible == 1, "Yes", "No")
+  
+  consent <- ifelse(df_sc_filtered$consent == 1, "Yes", "No")
+  
+  if (df_sc_filtered$gender == 0) {
+    return_string2 <- sprintf("
+        <b><u>Reproductive History</u></b> <br>
+        <b>E1. Is patient currently pregnant?</b> : %s <br>
+        <b>E3. [if Yes to E1] Expected date of child birth</b> : %s <br>
+        <b>E2a. [if No to E1] Is participant on family planning?</b> : %s <br>
+        <b>E2b. [if Yes to E2a] Family planning method</b> : %s <br>
+        <b><u>Eligibility and Consent</u></b> <br>
+        <b>All criteria for study inclusion met?</b> : %s <br>
+        <b>If eligible, did patient complete consent procedures and consent to participate?</b> : %s <br>", 
+                              pregnant,edd,use_fp,fp_method,eligible,consent)
+    
+  } else {
+    return_string2 <- return_string2 <- sprintf("
+        <b><u>Eligibility and Consent</u></b> <br>
+        <b>All criteria for study inclusion met?</b> : %s <br>
+        <b>If eligible, did patient complete consent procedures and consent to participate?</b> : %s <br>", 
+                                                eligible,consent)
+  }
+  
+  return(c(return_string, return_string2))
+}
+
+
+# --------------------------------------------
+# GET TRACKING DETAILS
+# --------------------------------------------
+get_tracking_info = function(df, study_id, selected_date) {
+  
+  df <- df %>%
+    filter(studyid == toupper(study_id), as.Date(as.character(tdate)) == as.Date(as.character(selected_date)))
+  
+  #print(df)
+  trackreason <- ifelse(df$trackreason==1, "Participant missed scheduled clinic visit", df$trackreasonoth)
+  trackingoutcome <- ifelse(df$trackingoutcome == 1, "Participant found and/or contacted", "Participant not found")
+   
+  
+  found_outcome <- ifelse(df$tofound == 1,"Visit conducted at offsite location today",
+                      ifelse(df$tofound == 2,"Visit scheduled for later date",
+                             ifelse(df$tofound == 3, "Visit scheduled for later date",
+                                    ifelse(df$tofound == 4,"Visit conducted by phone today",
+                                           ifelse(df$tofound == 5,"Participant found, but reports transfer of care to other facility",
+                                                  ifelse(df$tofound == 5,"Participant declined further participation in study",
+                                                         ifelse(df$tofound == 6, df$foundother,"N/A")))))))
+  
+  
+  not_found_outcome <- ifelse(df$tonotfound == 1, "Participant moved away, per neighbor or family member",
+                          ifelse(df$tonotfound == 2, "Participant has died, per neighbor or family member",
+                                 ifelse(df$tonotfound == 3, "Participant not found, but still residing in household per neighbor or family member",
+                                        ifelse(df$tonotfound == 4,"Participant not found at home, could not confirm if still residing in same location",
+                                               ifelse(df$tonotfound == 5,"Participant’s home could not be located",
+                                                      ifelse(df$tonotfound == 6,df$notfoundother, "N/A"))))))
+  
+  other_tracking_info <- ifelse(df$trackingdetails == -6, "N/A",df$trackingdetails)
+  
+  return_string <- ""
+  
+  if (df$trackingoutcome==1) {
+    return_string = sprintf("<b><u>TRACKING DETAILS </u></b> <br>
+    <b>Tracking Reason </b>: %s <br>
+    <b>Tracking Outcome </b>: %s <br>
+    <b>Found Outcome </b>: %s <br>
+    <b>Other Tracking Details </b>: %s <br>
+                            ", trackreason, trackingoutcome, found_outcome,other_tracking_info)
+    
+  } else {
+    
+    return_string = sprintf("<b><u>TRACKING DETAILS </u></b> <br>
+    <b>Tracking Reason </b>: %s <br>
+    <b>Tracking Outcome </b>: %s <br>
+    <b>Found Outcome </b>: %s <br>
+    <b>Other Tracking Details </b>: %s <br>
+                            ", trackreason, trackingoutcome, not_found_outcome,other_tracking_info)
+    
+  }
+  
+   return(return_string)
+}
+
+# --------------------------------------------
+# GET WITHDRAW/MOVE OUT DETAILS
+# --------------------------------------------
+
+get_move_out_info <- function(df, studyid) {
+  
+  return_string = ""
+  df_w <- df %>%
+    filter(studyid == studyid)
+  
+  move_withdraw <- ifelse(df_w$withdrawmove == 1, "Withdrawn from Study", "Moved out of study clinic")
+  
+  # Withdrawal Details
+  reason <- ifelse(df_w$withdrawreason == -9, "N/A",
+                   ifelse(df_w$withdrawreason == 1, " Participant determined to be ineligible",
+                          ifelse(df_w$withdrawreason == 2, "Withdrawal of informed consent", 
+                                 ifelse(df_w$withdrawreason == 3, "Study participant death",df_w$withdrawreasonoth))))
+  
+  ineligiblereason <- ifelse(df_w$ineligiblereason == 1, "Negative HIV test", 
+                             ifelse(df_w$ineligiblereason == 2,df_w$ineligiblereasonoth,"N/A"))
+  
+  # Move out details
+  location = ifelse(df_w$location == -7, "Unknown", df_w$location)
+  village = ifelse(df_w$village == -7, "Unknown", df_w$village)
+  facility = ifelse(df_w$facility == -7, "Unknown", df_w$facility)
+  withdrawstatus = ifelse(df_w$withdrawstatus == 1, "Participant has resumed study activities","Participant remains out of the study")
+  resumedate = ifelse(df_w$resumedate %in% c("2018-11-01","01/11/2018", "01/01/2000"), "N/A",as.character(df_w$resumedate)) 
+  
+  if (df_w$withdrawmove == 1) {
+    return_string = sprintf("<b><u>WITHDRAWAL DETAILS </b></u> <br>
+    <b> Withdrawal Reason: <b> %s <br>
+    <b> Participant Ineligible Reason: <b> %s <br>
+                            ", reason, ineligiblereason)
+    
+  } else {
+    return_string = sprintf("<b><u>MOVE OUT DETAILS </b></u> <br>
+    <b>Move Out Location </b> : %s <br>
+    <b>Move Out Village </b> : %s <br>
+    <b>Move Out Facility </b> : %s <br>
+    <b><u>MOVE OUT Status </b></u> <br>
+    <b>Move out Status </b> : %s <br>
+    <b>Date Resumed Study Activities </b> : %s <br>
+                            ",location, village, facility, withdrawstatus, resumedate)
+   
+  }
+  
+  return(return_string)
+}
 
 # --------------------------------------------
 # TIME VISUALIZATION DATA FRAME
@@ -429,3 +721,238 @@ get_dashboard_data <- function(df, main_breakdown, sub_breakdown) {
   }
   return(dt)
 }
+
+
+# --------------------------------------------------------------------
+# GENERATE RETENTION STATUS
+# --------------------------------------------------------------------
+
+# Latest visit date
+get_date_last_seen = function(df,df_f) {
+  df_visits <- df_f %>%
+    filter(studyid == df['studyid']) %>%
+    arrange(desc(as.Date(as.character(vdate))))
+  
+  if (nrow(df_visits)>0) {
+    return(as.character(df_visits[1,'vdate']))
+  } else {
+    return(as.character(df['enrdate']))
+  }
+  
+}
+
+
+# Get hypentensive status
+get_hyptension_status = function(df,df_f) {
+  
+  df_visits <- df_f %>%
+    filter(studyid == df['studyid'], (bp_systolic_1 != -9| bp_diastolic_1 != -9)) %>%
+    arrange(desc(as.Date(as.character(vdate))))
+  
+  if (nrow(df_visits)>0) {
+     if (df_visits[1,'bp_systolic_1'] >= 140 | df_visits[1,'bp_diastolic_1'] >= 90) {
+       return("Hypertensive")
+     } else {
+       return("Not Hypertensive")
+     }
+     
+  } else {
+    if (df['ever_had_hyp'] == 1) {
+      return("Hypertensive")
+    } else {
+      return("Not Hypertensive")
+    }
+  }
+}
+
+# Get Diabetic status
+get_diabetic_status = function(df,df_f) {
+  
+  df_visits <- df_f %>%
+    filter(studyid == df['studyid'], (f_glucose != -9 | hgb != -9)) %>%
+    arrange(desc(as.Date(as.character(vdate))))
+  
+  if (nrow(df_visits)>0) {
+    if (df_visits[1,'f_glucose'] >= 7.0 | df_visits[1,'hgb'] >= 6.6) {
+      return("Diabetic")
+    } else {
+      return("Not Diabetic")
+    }
+    
+  } else {
+    if (df['ever_had_diab'] == 1) {
+      return("Diabetic")
+    } else {
+      return("Not Diabetic")
+    }
+  }
+}
+
+
+# Get High Cholestrol status
+get_cholestrol_status = function(df,df_f) {
+  
+  df_visits <- df_f %>%
+    filter(studyid == df['studyid'], (f_trig != -9 | f_hdl_chol != -9 | f_hdl_chol != -9)) %>%
+    arrange(desc(as.Date(as.character(vdate))))
+  
+  if (nrow(df_visits)>0) {
+    if (df_visits[1,'f_trig'] >= 1.7 | (df_visits[1,'f_hdl_chol'] < 0.9 & df_visits[1,'gender']=="Male") | (df_visits[1,'f_hdl_chol'] < 1.0 & df_visits[1,'gender']=="Female")) {
+      return("High Cholestrol")
+    } else {
+      return("Not High Cholestrol")
+    }
+    
+  } else {
+    if (df['ever_had_chol'] == 1) {
+      return("High Cholestrol")
+    } else {
+      return("Not High Cholestrol")
+    }
+  }
+}
+
+# get Obsesity Status
+
+# Get Obsesity/Overweight status
+get_bmi_status = function(df,df_f) {
+  
+  df_visits <- df_f %>%
+    filter(studyid == df['studyid'], !is.na(bmi)) %>%
+    arrange(desc(as.Date(as.character(vdate))))
+  
+  if (nrow(df_visits)>0) {
+    if (df_visits[1,'bmi'] >= 30) {
+      return("Obese")
+    } else if (df_visits[1,'bmi'] >= 25){
+      return("Overweight")
+    } else {
+      return("Normal weight")
+    }
+    
+  } else {
+    if (df['bmi'] >= 30) {
+      return("Obese")
+    } else if (df['bmi'] >= 25) {
+      return("Overweight")
+    } else {
+      return("Normal weight")
+    }
+  }
+}
+
+create_retention_data = function(df_enr, df_fu) {
+  df_final <- df_enr
+  df_final$last_seen = apply(df_final, 1, get_date_last_seen, df_f = df_fu)
+  df_final$hypertension_status = apply(df_final, 1, get_hyptension_status, df_f = df_fu)
+  df_final$diabetic_status = apply(df_final, 1, get_diabetic_status, df_f = df_fu)
+  df_final$cholestrol_status = apply(df_final, 1, get_cholestrol_status, df_f = df_fu)
+  df_final$bmi_status = apply(df_final, 1, get_bmi_status, df_f = df_fu)
+  
+  six_months_ago = Sys.Date() - 180
+  
+  df_final$retention_status = with(df_final, 
+                         ifelse(as.Date(as.character(last_seen)) < six_months_ago, 'Not Retained (no visit 6 mo)', 'Retained'))
+  
+  df_final <- df_final %>%
+    select(studyid, gender, last_seen, retention_status, hypertension_status, cholestrol_status, diabetic_status, bmi_status)
+  
+  return(df_final)
+}
+
+# -------------------------------------------
+# SCHEDULE TABLE
+# Helper function to create the schedule table for the day
+# -------------------------------------------
+
+
+createSchedule = function(df_enr, df_track, df_fu){
+  if (length(df_enr)== 0){
+    return(data.frame())
+  }
+  else{
+    # TODO: incorporate more stuff in here
+    df.final = df_enr[,c('studyid', 'next_visit_date', 'tca_fasting_labs')]
+    df.final$next_visit_date = as.Date(as.character(df.final$next_visit_date))
+    df.final$tca_fasting_labs = as.Date(as.character(df.final$tca_fasting_labs))
+    df.final$source = 'enrollment'
+    df.final$nextvisit <- with (df.final, ifelse(tca_fasting_labs %in% c("2000-01-01"), as.character(next_visit_date),
+                                                 as.character(tca_fasting_labs)))
+    
+    df.fu = df_fu[,c('studyid', 'next_visit_date', 'tca_fasting_labs')]
+    df.fu$next_visit_date = as.Date(as.character(df.fu$next_visit_date))
+    df.fu$tca_fasting_labs = as.Date(as.character(df.fu$tca_fasting_labs))
+    df.fu$source = 'follow-up'
+    df.fu$nextvisit <- with (df.fu, ifelse(tca_fasting_labs %in% c("2000-01-01"), as.character(next_visit_date),
+                                           as.character(tca_fasting_labs)))
+    
+    df.track = df_track[,c('studyid', 'visitscheddate')]
+    df.track$visitscheddate = as.Date(as.character(df.track$visitscheddate))
+    df.track = df.track[df.track$visitscheddate > '2000-01-01',]
+    
+    
+    if (length(df.fu$studyid) > 0){
+      #colnames(df.fu) = c('youthid', 'nextvisit')
+      df.final = rbind(df.final, df.fu)
+      df.final <- df.final[,c('studyid', 'nextvisit', 'source')]
+    }
+    
+    if (length(df.track$studyid) > 0){
+      colnames(df.track) = c('studyid', 'nextvisit')
+      df.track$source = 'track'
+      df.final = rbind(df.final, df.track)
+    }
+    
+    #print(df.final)
+    df.final$nextvisit = as.Date(as.character(df.final$nextvisit))
+    return(df.final)
+  }
+}
+
+# -------------------------------------------
+# GENERATE RAW MISSED VISITS TABLE
+# -------------------------------------------
+
+getMissedVisits = function(df_fu, df_track, df_scheduled){
+  
+  df_track_temp = df_track[,c('studyid', 'tdate')]
+  colnames(df_track_temp) = c('studyid', 'vdate')
+  
+  
+  df_visits = rbind(df_fu[,c('studyid', 'vdate')],
+                    df_track_temp)
+  
+  df_visits$vdate = as.Date(as.character(df_visits$vdate))
+  
+  df_visits = arrange(df_visits, studyid, desc(vdate))
+  
+  # drop duplicates - keep the latest visit and drop all the others
+  df_visits = df_visits[!duplicated(df_visits$studyid),]
+  
+  df_scheduled$nextvisit = as.Date(as.character(df_scheduled$nextvisit))
+  
+  df_past_scheduled = df_scheduled
+  
+  # order by studyid, source and in desc(nextvisit) - latest appointment on top
+  df_past_scheduled = arrange(df_past_scheduled, studyid, source, desc(nextvisit))
+  
+  #drop any duplicate appointments
+  df_past_scheduled = df_past_scheduled[!duplicated(df_past_scheduled[,c('studyid', 'source')]),]
+  
+  # get current schedules i.e. not beyond the current data
+  df_past_scheduled = df_past_scheduled[as.Date(as.character(df_past_scheduled$nextvisit)) < Sys.Date(),]
+  df_past_scheduled = arrange(df_past_scheduled, studyid, desc(nextvisit))
+  
+  #drop any duplicate appointments
+  df_past_scheduled = df_past_scheduled[!duplicated(df_past_scheduled$studyid),]
+  
+  df_merge = merge(df_past_scheduled, df_visits, by = 'studyid')
+  df_merge = df_merge[as.Date(as.character(df_merge$nextvisit)) > as.Date(as.character(df_merge$vdate)) + 7,]
+  df_merge$nextvisit = as.Date(as.character(df_merge$nextvisit))
+  
+  df_merge = df_merge[,c('studyid',  'nextvisit', 'source', 'vdate')]
+  colnames(df_merge) = c('studyid',  'missedvisitdate', 'source','Last_seen')
+  return(df_merge)
+}
+
+

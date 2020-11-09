@@ -24,8 +24,9 @@ ui <- dashboardPage(
       menuItem("Data QC", tabName = "data_qc",icon = icon("database"),
                menuSubItem("QC Reports", tabName = "qc_report")),
       menuItem("Reports", tabName = "reports", icon = icon("th"),
-               menuSubItem("Missed Visits", tabName = "missed_visit"),
-               menuSubItem("Withdrawals/Move", tabName = "withdrawal")),
+               menuSubItem("Scheduled/Missed Visits", tabName = "missed_visit"),
+               menuSubItem("Withdrawals/Move", tabName = "withdrawal"),
+               menuSubItem("Retention", tabName = "retention")),
       menuItem("Downlaod", tabName = "raw_data_download", icon = icon("download")),
       hr(),
       " Find Study Id",
@@ -73,10 +74,29 @@ ui <- dashboardPage(
                     plotlyOutput("plot1_enrollment")
                     ),
                 
-                box(title="Enrollment by All/Sub Categories", 
+                box(title="Monthly Enrollment Progress", 
                     htmlOutput("enroll_sub"),
-                    div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
-                    downloadButton("download1","Download csv")
+                    plotlyOutput("plot2_enrollment")
+                    #div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
+                    #downloadButton("download1","Download csv")
+                )
+              )
+              ),
+      tabItem(tabName = "missed_visit",
+              fluidRow(
+                box(status = 'primary', solidHeader = TRUE,title = 'Scheduled Visits',
+                    dateInput('svisit_since', 'From:', value = Sys.Date()), 
+                    dateInput('svisit_to', 'To:', value = Sys.Date()), 
+                    HTML('<br><br>'),
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('sch_visits')),
+                    downloadButton("sch_download","Download csv")
+                ),
+                box(status = 'primary', solidHeader = TRUE,title = 'Missed Visits',
+                    dateInput('mvisit_since', 'From:', value = '2019-03-01'), 
+                    dateInput('mvisit_to', 'To:', value = Sys.Date() - 1), 
+                    HTML('<br><br>'),
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('m_visits')),
+                    downloadButton("m_download","Download csv")
                 )
               )
               ),
@@ -100,15 +120,47 @@ ui <- dashboardPage(
               fluidRow(
                 
                 box(status = 'primary', solidHeader = TRUE,title = 'Follow-up Visits',
-                    selectInput("fu_visits", label = "Breakdown: ",
+                    selectInput("fu_visit_selection", label = "Breakdown: ",
                                 choices = c('All','Month 1', 'Month 3','Month 6'))
                 ),
                 box(status = 'primary', solidHeader = TRUE,title = 'Incidence',
-                    selectInput("fu_incidence", label = "Sub Category: ",
-                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Obesity'))
+                    selectInput("fu_incidence_selection", label = "Sub Category: ",
+                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Overweight','Obesity'))
                     
                 )
+              ),
+              fluidRow(
                 
+                box(
+                  div(style = 'overflow-x: scroll', DT::dataTableOutput('fu_visits')),
+                  downloadButton("fu_download","Download csv")
+                
+                ),
+                box(
+                  div(style = 'overflow-x: scroll', DT::dataTableOutput('fu_visits_incidence')),
+                  downloadButton("fu_incidence_download","Download csv")
+                )
+              )
+              ),
+      tabItem(tabName = "retention",
+              h2("Retention Summary"),
+              fluidRow(
+                # Dynamic valueBoxes
+                valueBoxOutput("retention_Summary_prop"),
+                valueBoxOutput("retention_gender"),
+                valueBoxOutput("retention_hyp")
+              ),
+              fluidRow(
+                box(title="Retention Summary", 
+                    plotlyOutput("plot3_retention"),
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('retention_list')),
+                    downloadButton("download1_ret","Download csv")
+                ),
+                box(title="Retention Summary", 
+                    plotlyOutput("plot4_retention")
+                    #div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
+                    #downloadButton("download1","Download csv")
+                )
               )
               ),
       tabItem(tabName = "raw_data_download",

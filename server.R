@@ -47,16 +47,25 @@ df_all_tables <- list(
 
 # Format columns in the data set
 df_enr$gender <- factor(df_enr$gender, levels = c(0,1), labels = c("Female","Male"))
-df_enr$enrdate_0 <- as.Date(as.character(df_enr$enrdate), format = "%d/%m/%Y")
-df_withdraw$tdate_0 <- as.Date(as.character(df_withdraw$tdate), format = "%d/%m/%Y")
-df_trk$tdate_0 <- as.Date(as.character(df_trk$tdate), format = "%d/%m/%Y")
-df_followup$vdate_0 <- as.Date(as.character(df_followup$vdate), format = "%d/%m/%Y")
-df_scr$screendate_0 <- as.Date(as.character(df_scr$screendate), format = "%d/%m/%Y")
+df_followup$gender <- factor(df_followup$gender, levels = c(0,1), labels = c("Female","Male"))
+df_enr$enrdate_0 <- as.Date(as.character(df_enr$enrdate))
+df_withdraw$tdate_0 <- as.Date(as.character(df_withdraw$tdate))
+df_trk$tdate_0 <- as.Date(as.character(df_trk$tdate))
+df_followup$vdate_0 <- as.Date(as.character(df_followup$vdate))
+df_scr$screendate_0 <- as.Date(as.character(df_scr$screendate))
+df_enr$vmonth <- paste(year(as.Date(as.character(df_enr$enrdate))),month(as.Date(as.character(df_enr$enrdate)), label = TRUE), sep ="-")
+
 
 df_enr <- set_age_group(df_enr, df_scr)
 
 df_enr$bmi <- apply(df_enr, 1, calculate_bmi)
 
+df_enr_temp <- df_enr %>%
+  select(studyid, height)
+
+df_followup$bmi <- apply(df_followup, 1, calculate_bmi_fu, df_en = df_enr_temp)
+
+df_retention <- create_retention_data(df_enr, df_followup)
 
 # guidance og google authentication is availabe here https://lmyint.github.io/post/shiny-app-with-google-login/
 # and https://gist.github.com/explodecomputer/ef4341872582719d6b73
@@ -301,7 +310,152 @@ server <- function(input, output, session) {
        color = "green"
      )
    })
+   
+   output$new_hypertenstion <- renderValueBox({
+     t<-length(enrollment_data()$studyid)
+     known_hyp_df <- enrollment_data() %>%
+       filter(ever_had_hyp == 1)
+     
+     n <- follow_up_data() %>%
+       filter((bp_systolic_1 >= 140 | bp_diastolic_1 >= 90), !(studyid %in% known_hyp_df$studyid)) %>%
+       count()
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "New Hypertensive",
+       color = "yellow"
+     )
+   })
+   
+   output$new_diabetic <- renderValueBox({
+     
+     t<-length(enrollment_data()$studyid)
+     known_diab_df <- enrollment_data() %>%
+       filter(ever_had_diab == 1)
+     
+     n <- follow_up_data() %>%
+       filter((f_glucose >= 7.0 | hgb >= 6.5), !(studyid %in% known_diab_df$studyid)) %>%
+       count()
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "New Diabetic",
+       color = "yellow"
+     )
+     
+   })
+   
+   
+   output$new_cholestrol <- renderValueBox({
+     t<-length(enrollment_data()$studyid)
+     known_chol_df <- enrollment_data() %>%
+       filter(ever_had_chol == 1)
+     
+     n <- follow_up_data() %>%
+       filter((f_trig >= 1.7 | (f_hdl_chol < 0.9 & gender=="Male") | (f_hdl_chol < 1.0 & gender=="Female")), !(studyid %in% known_chol_df$studyid)) %>%
+       count()
+     result <- round(100 * n/t,1)
+     valueBox(
+       
+       paste0(result,"%","(",n,"/",t,")"), "New High Cholestrol",
+       color = "yellow"
+     )
+   })
+   # -------------------------------------------
+   # DATA TABLES FOR FOLLOW_UP TAB
+   # -------------------------------------------   
+   # Add downloadable list
+   df_temp_fu <- reactive({
+     ret_value <- df_followup %>%
+       select(studyid, clinicid,gender,vdate,fuvnumber, weight_change,weight, bp_systolic_1,bp_diastolic_1,next_visit_date,
+              hgb, f_glucose, f_hdl_chol,f_trig, bmi 
+              )
+     
+   })
+   
+   output$fu_visits <- DT::renderDataTable({
+     dt <- df_temp_fu()
+     
+     if( input$fu_visit_selection == 'Month 1') {
+       dt <- df_temp_fu() %>%
+         filter(fuvnumber == 1)
+     } else if( input$fu_visit_selection == 'Month 3') {
+       dt <- df_temp_fu() %>%
+         filter(fuvnumber == 3)
+     } else if( input$fu_visit_selection == 'Month 6') {
+       dt <- df_temp_fu() %>%
+         filter(fuvnumber == 6)
+     } else {
+       dt <- df_temp_fu()
+     }
+       
+     
+     #add functionality to the download button
+     datatable(dt,
+               escape=F, selection = 'none', filter = 'top', rownames = FALSE,
+               callback = JS("$('div.dwnld').append($('#fu_download'));"),
+               extensions = 'Buttons')
+   })
+   
+   output$fu_visits_incidence <- DT::renderDataTable({
+     dt <- df_temp_fu()
+     
+     if (input$fu_incidence_selection == "Hypertensive") {
+       
+       dt <- df_temp_fu() %>%
+         filter(bp_systolic_1 >=140 | bp_diastolic_1 >= 90)
+       
+     } else if (input$fu_incidence_selection == "Diabetic") {
+       
+       dt <- df_temp_fu() %>%
+         filter(f_glucose >= 7.0 | hgb >= 6.5)
+       
+     } else if (input$fu_incidence_selection == "High Cholestrol") {
+       
+       dt <- df_temp_fu() %>%
+         filter(f_trig >= 1.7 | (f_hdl_chol < 0.9 & gender=="Male") | (f_hdl_chol < 1.0 & gender=="Female"))
+       
+     } else if (input$fu_incidence_selection == "Obesity") {
+       
+       dt <- df_temp_fu() %>%
+         filter(bmi >=30)
+       
+     } else if (input$fu_incidence_selection == "Overweight") {
+       
+       dt <- df_temp_fu() %>%
+         filter(bmi>=25)
+       
+     } else {
+       dt <- df_temp_fu()
+     }
+     
+     #add functionality to the download button
+     datatable(dt,
+               rownames = FALSE,
+               callback = JS("$('div.dwnld').append($('#fu_incidence_download'));"),
+               extensions = 'Buttons')
+   })
   
+   
+   # Code to manage download for fu incidence
+   output$fu_incidence_download <- downloadHandler(
+     filename = function() {
+       paste('fu_list1-', Sys.Date(), '.csv', sep='')
+     },
+     content = function(con) {
+       write.csv(df_temp_fu(), con)
+     }
+   )
+   
+   # Code to manage download for fu visits
+   output$fu_download <- downloadHandler(
+     filename = function() {
+       paste('fu_list2-', Sys.Date(), '.csv', sep='')
+     },
+     content = function(con) {
+       write.csv(df_temp_fu(), con)
+     }
+   )
   # -------------------------------------------
   # SCREENING AND ENROLLMENT Details
   # -------------------------------------------
@@ -368,6 +522,7 @@ server <- function(input, output, session) {
   
   
   ## Enrollment graph by Gender/sex
+  
   output$plot1_enrollment <- renderPlotly({
     df <- df_enr #get_dashboard_data(df_enr, input$breakdown,input$subcategory)
     
@@ -409,6 +564,48 @@ server <- function(input, output, session) {
     ggplotly(p) %>% config(displayModeBar = FALSE)
   })
   
+  output$plot2_enrollment <- renderPlotly({
+    df <- df_enr #get_dashboard_data(df_enr, input$breakdown,input$subcategory)
+    
+    if( input$breakdown == "Gender") {
+      if(input$subcategory != "All") {
+        df <- df_enr %>%
+          filter(gender == input$subcategory)
+      }
+      
+    } else if (input$breakdown == "Age-group") {
+      if( input$subcategory != "All") {
+        df <- df_enr %>%
+          filter(age_group == input$subcategory)
+      }
+      
+    } else if (input$breakdown == "Pre-conditions") {
+      if(input$subcategory == "Hypertensive") {
+        df <- df_enr %>%
+          filter(ever_had_hyp == 1)
+      } else if(input$subcategory == "Diabetic") {
+        df <- df_enr %>%
+          filter(ever_had_diab == 1)
+      } else if(input$subcategory == "Cholestrol") {
+        df <- df_enr %>%
+          filter(ever_had_chol == 1)
+      } else if(input$subcategory == "Obesity") {
+        df <- df_enr %>%
+          filter(bmi >= 30.0)
+      } 
+    }
+    
+    
+    
+    
+    p <- ggplot(df, aes(x=vmonth,fill=gender)) +
+      geom_bar(stat = "count") +
+      xlab("Visit Month") +
+      ylab("Number Enrolled") +
+      ggtitle("Monthly enrollment summary") +
+      theme_minimal()
+    ggplotly(p) %>% config(displayModeBar = FALSE)
+  })
   # Add downloadable list
   df_temp <- reactive({
     ret_value <- enrollment_data() %>%
@@ -416,6 +613,7 @@ server <- function(input, output, session) {
              bmi, ever_had_hyp,ever_had_diab,ever_had_chol)
     
   })
+  
   output$enrollment_list <- DT::renderDataTable({
    dt <- df_temp() #get_dashboard_data(df_temp(), input$breakdown,input$subcategory)
    
@@ -528,7 +726,7 @@ server <- function(input, output, session) {
   ##-------------------------------------------
   df_timeline_viz_data <- reactive({
     data <- create_timeline_df(df_scr, df_enr, df_followup, df_withdraw, df_trk, studyid_select())
-    #print(data)
+    print(data)
   })
   
   ## ------------------------------------------
@@ -604,9 +802,29 @@ server <- function(input, output, session) {
                  )
         )
       } else if(grepl("Screening", df_selected_item$content)) {
-        print(paste("Screening selected", row_id))
+        
+        details_header <- sprintf("<h4>Screening Details: %s </h4>",format(selected_date(), format = '%Y-%B-%d'))        
+        fluidRow(column(12, HTML(details_header),
+                        tabsetPanel(id = 'tabs', type = 'tabs',
+                                    tabPanel('Basic Information', htmlOutput('basic_scr_info')),
+                                    selected = input$tabs
+                                    )))
+        
       } else if(grepl("Followup", df_selected_item$content)) {
-        print(paste("Followup selected", row_id))
+        
+        details_header <- sprintf("<h4>Followup Visit Details: %s </h4>",format(selected_date(), format = '%Y-%B-%d'))
+        
+        fluidRow(
+          column(12, HTML(details_header),
+                 tabsetPanel(id = 'tabs', type = 'tabs',
+                             tabPanel('Symptoms and ART Adherence', htmlOutput('fu_art_sym')),
+                             tabPanel('Food Security', htmlOutput('fu_food_security')),
+                             tabPanel('Reproductive History', htmlOutput('rep_history_fu')),
+                             tabPanel('Follow-up Biometric Data', htmlOutput('fu_info')),
+                             selected = input$tabs
+                 )
+          )
+        )
         
        
         
@@ -622,7 +840,7 @@ server <- function(input, output, session) {
                  column(12, htmlOutput('tracking_details')))
         
       } else if(grepl("Moved", df_selected_item$content)) {
-        print(paste("Move out selected", row_id))
+        #print(paste("Move out selected", row_id))
         
         fluidRow(column(12, HTML(sprintf('<h4>Participant Moved: %s</h4>', format(selected_date(), format = '%Y-%B-%d')))),
                  column(12, htmlOutput('move_out_details')))
@@ -632,9 +850,9 @@ server <- function(input, output, session) {
     
   })
   
-  # -----------------------------------------------
-  # CREATE HTML OUTPUTS FOR VARIOUS VISIT DETAILS OR TABS
-  # -----------------------------------------------
+  # ------------------------------------------------------------------
+  # CREATE HTML OUTPUTS FOR VARIOUS ENROLLMENT VISIT DETAILS OR TABS
+  # ------------------------------------------------------------------
   output$hiv_history <- renderUI({
   hivhistory <- get_hiv_history(df_enr, studyid_select())
   HTML(hivhistory)
@@ -676,6 +894,74 @@ server <- function(input, output, session) {
     ))
   })
   
+  
+  # ------------------------------------------------------------------
+  # CREATE HTML OUTPUTS FOR VARIOUS FOLLOW-UP VISIT DETAILS OR TABS
+  # ------------------------------------------------------------------
+  
+  output$fu_food_security <- renderUI({
+    food_details <- get_food_security(df_followup,studyid_select(),'f', selected_date())
+    
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(food_details[[1]])),
+      column(6, HTML(food_details[[2]]))
+    ))
+  })
+  
+  
+  output$rep_history_fu <- renderUI({
+    reproductive_history <- get_reproductive_history_fu(df_followup, studyid_select(), selected_date())
+    HTML(reproductive_history)
+  })
+  
+  
+  output$fu_info <- renderUI({
+    baseline_info <- get_followup_details(df_followup, studyid_select(), selected_date())
+    
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(baseline_info[[1]])),
+      column(6, HTML(baseline_info[[2]]))
+    ))
+  })
+  
+  output$fu_art_sym <- renderUI({
+    sym_art_adherence <- get_fu_sysmptom_n_art_adherence(df_followup, studyid_select(), selected_date())
+    HTML(sym_art_adherence)
+  })
+  
+  
+  # ---------------------------------------
+  # CREATE HTML OUTPUTS FOR SCREENING INFO
+  # ---------------------------------------
+  
+  output$basic_scr_info <- renderUI({
+    basic_data <- get_screening_info(df_scr, studyid_select())
+    fluidPage(fluidRow(
+      HTML('<br>'),
+      column(6, HTML(basic_data[[1]])),
+      column(6, HTML(basic_data[[2]]))
+    ))
+  })
+  
+  
+  # -------------------------------------------
+  # WITHDRAWAL/MOVE OUT DETAILS
+  # -------------------------------------------
+  output$move_out_details <- renderUI({
+    move <- get_move_out_info(df_withdraw, studyid_select())
+    HTML(move)
+  })
+  
+  
+  # -------------------------------------------
+  # TRACKING DETAILS
+  # -------------------------------------------
+  output$tracking_details <- renderUI({
+    track_info <- get_tracking_info(df_trk, studyid_select(), selected_date())
+    HTML(track_info)
+  }) 
   # -------------------------------------------
   # DOWNLOAD FOR VARIOUS RAW DATASETS
   # -------------------------------------------
@@ -733,5 +1019,155 @@ server <- function(input, output, session) {
     }
   )
   
+  
+  #----------------------------------------------------------
+  # RETENTION UI
+  #----------------------------------------------------------
+  
+  # -------------------------------------------
+  # VALUE BOXES ON THE RETENTION TAB
+  # -------------------------------------------   
+  output$retention_gender <- renderValueBox({
+    dt <- df_retention %>%
+      filter(!duplicated(studyid))
+    
+    df_retained <- dt %>%
+      filter(gender == 'Male')
+    
+    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    
+    valueBox(
+      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Male Proportion Retained",
+      color = "aqua"
+    )
+  })
+  
+  output$retention_hyp <- renderValueBox({
+    dt <- df_retention %>%
+      filter(!duplicated(studyid))
+    
+    df_retained <- dt %>%
+      filter(hypertension_status == 'Hypertensive')
+    
+    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    
+    valueBox(
+      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Hypertensive Proportion Retained",
+      color = "aqua"
+    )
+  })
+  
+  output$retention_Summary_prop <- renderValueBox({
+    dt <- df_retention %>%
+      filter(!duplicated(studyid))
+    
+    df_retained <- dt %>%
+      filter(retention_status == 'Retained')
+    
+    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    valueBox(
+      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Proportion Retained",
+      color = "aqua"
+    )
+  })
+  
+  ## Get Retention Plot
+  
+  output$plot3_retention <- renderPlotly({
+    df <- df_retention
+    
+    
+    p<-ggplot(df, aes(x=retention_status,fill=gender)) +
+      xlab("") +
+      geom_bar(stat = "count") +
+      theme_minimal()
+    ggplotly(p) %>% config(displayModeBar = FALSE)
+  })
+  
+  
+  ## Get Retention Plot
+  
+  output$plot4_retention <- renderPlotly({
+    df <- df_retention
+    
+    
+    p<-ggplot(df, aes(x=retention_status,fill=hypertension_status)) +
+      xlab("") +
+      geom_bar(stat = "count") +
+      theme_minimal()
+    ggplotly(p) %>% config(displayModeBar = FALSE)
+  })
+  
+  # Retention table and download code
+  output$retention_list <- DT::renderDataTable({
+    dt <- df_retention #get_dashboard_data(df_temp(), input$breakdown,input$subcategory)
+    
+    
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download1_ret'));"),
+              extensions = 'Buttons')
+  })
+  
+  # retention List
+  output$download1_ret <- downloadHandler(
+    filename = function() {
+      paste('retention_list1-', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(df_retention, con)
+    }
+  )
+  
+  #----------------------------------------------------------
+  # SCHEDULED/MISSED VISITS UI
+  #----------------------------------------------------------
+  
+  df_scheduled <- reactive({
+    dt <- createSchedule(df_enr, df_trk, df_followup)
+  })
+  
+  # Scheduled visits table and download code
+  output$sch_visits <- DT::renderDataTable({
+    dt <- df_scheduled()
+    dt <- dt %>%
+      filter(between(as.Date(as.character(nextvisit)), as.Date(as.character(input$svisit_since)),
+                     as.Date(as.character(input$svisit_to))))
+    
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#sch_download'));"),
+              extensions = 'Buttons')
+  })
+  
+  # retention List
+  output$sch_download <- downloadHandler(
+    
+    filename = function() {
+      paste('scheduled-', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      dt <- createSchedule(df_enr, df_trk, df_followup)
+      dt <- dt %>%
+        filter(between(as.Date(as.character(nextvisit)), as.Date(as.character(input$svisit_since)),
+                       as.Date(as.character(input$svisit_to))))
+      write.csv(dt, con)
+    }
+  )
+  
+  # Scheduled visits table and download code
+  output$m_visits <- DT::renderDataTable({
+    df_scheduled <- df_scheduled()
+    
+    dt <- getMissedVisits(df_followup, df_trk, df_scheduled)
+    dt <- dt %>%
+      filter(between(as.Date(as.character(missedvisitdate)), as.Date(as.character(input$mvisit_since)),
+                     as.Date(as.character(input$mvisit_to))))
+    
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#sch_download'));"),
+              extensions = 'Buttons')
+  })
   
 }
