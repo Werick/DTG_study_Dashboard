@@ -25,6 +25,72 @@ calculate_bmi <- function(df) {
   
 }
 
+get_hyptension_status_baseline <- function(df) {
+  # use normal values if any
+  hyp_status1 = FALSE
+  hyp_status2 = FALSE
+  hyp_status3 = FALSE
+  
+  if (df['bp_systolic_3'] != -6 | df['bp_diastolic_3'] != -6) {
+    if (df['bp_systolic_3'] >= 140 | df['bp_diastolic_3'] >= 90) {
+      hyp_status3 = TRUE
+    }
+  }
+  
+  if (df['bp_systolic_2'] != -6 | df['bp_diastolic_2'] != -6) {
+    if (df['bp_systolic_2'] >= 140 | df['bp_diastolic_2'] >= 90) {
+      hyp_status2 = TRUE
+    }
+  }
+  
+  if (df['bp_systolic_1'] != -6 | df['bp_diastolic_1'] != -6) {
+    if (df['bp_systolic_1'] >= 140 | df['bp_diastolic_1'] >= 90) {
+      hyp_status1 = TRUE
+    }
+  }
+  
+  if (hyp_status1 & hyp_status2 & hyp_status3) {
+    return("Hypertensive")
+  } else {
+    return("Not Hypertensive")
+  }
+  
+}
+
+# Get High Cholestrol status
+get_cholestrol_status_baseline = function(df) {
+  
+  if (df['f_hdl_chol'] != -9) {
+    if (df['f_trig'] >= 1.7 | (df['f_hdl_chol'] < 0.9 & df['gender']=="Male") | (df['f_hdl_chol'] < 1.0 & df['gender']=="Female")) {
+      return("High Cholestrol")
+    } else {
+      return("Not High Cholestrol")
+    }
+    
+  } else {
+    if (df['f_trig'] >= 1.7) {
+      return("High Cholestrol")
+    } else {
+      return("Not High Cholestrol")
+    }
+  }  
+  
+}
+
+# Get Diabetic status
+get_diabetic_status_baseline = function(df) {
+  
+  if (df['f_glucose'] ==-9 & df['hgb'] == -9) {
+    return("Unknown")
+    
+    } else if (df['f_glucose'] >= 7.0 | df['hgb'] >= 6.6) {
+      return("Diabetic")
+    } else {
+      return("Not Diabetic")
+    }
+  
+}
+
 calculate_bmi_fu <- function(df_fu, df_en) {
   weight <- as.integer(df_fu['weight'])
   height <- as.integer(df_en[df_en$studyid == df_fu['studyid'], 'height'])
@@ -32,6 +98,15 @@ calculate_bmi_fu <- function(df_fu, df_en) {
   height_in_m <- height/100
   bmi <- weight/(height_in_m*height_in_m)
   return(round(bmi,1))
+  
+}
+
+calculate_weight_change <- function(df_fu, df_en) {
+  weight <- as.integer(df_fu['weight'])
+  weight_baseline <- as.integer(df_en[df_en$studyid == df_fu['studyid'], 'weight'])
+  #print(df_en[df_en$studyid == df_fu['studyid'], 'weight'])
+  weight_change <- 100* ((weight-weight_baseline)/weight_baseline)
+  return(round(weight_change,1))
   
 }
 
@@ -749,19 +824,36 @@ get_hyptension_status = function(df,df_f) {
     filter(studyid == df['studyid'], (bp_systolic_1 != -9| bp_diastolic_1 != -9)) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
+  # use normal values if any
+  hyp_status1 = FALSE
+  hyp_status2 = FALSE
+  hyp_status3 = FALSE
+  
   if (nrow(df_visits)>0) {
-     if (df_visits[1,'bp_systolic_1'] >= 140 | df_visits[1,'bp_diastolic_1'] >= 90) {
-       return("Hypertensive")
-     } else {
-       return("Not Hypertensive")
-     }
-     
-  } else {
-    if (df['ever_had_hyp'] == 1) {
-      return("Hypertensive")
-    } else {
-      return("Not Hypertensive")
+    if (df_visits[1, 'bp_systolic_3'] != -6 | df_visits[1, 'bp_diastolic_3'] != -6) {
+      if (df_visits[1, 'bp_systolic_3'] >= 140 | df_visits[1, 'bp_diastolic_3'] >= 90) {
+        hyp_status3 = TRUE
+      }
     }
+    
+    if (df_visits[1, 'bp_systolic_2'] != -6 | df_visits[1, 'bp_diastolic_2'] != -6) {
+      if (df_visits[1, 'bp_systolic_2'] >= 140 | df_visits[1, 'bp_diastolic_2'] >= 90) {
+        hyp_status2 = TRUE
+      }
+    }
+    
+    if (df_visits[1,'bp_systolic_1'] != -6 | df_visits[1,'bp_diastolic_1'] != -6) {
+      if (df_visits[1, 'bp_systolic_1'] >= 140 | df_visits[1,'bp_diastolic_1'] >= 90) {
+        hyp_status1 = TRUE
+      }
+    }
+     
+  } 
+  
+  if (hyp_status1 & hyp_status2 & hyp_status3) {
+    return("Hypertensive")
+  } else {
+    return("Not Hypertensive")
   }
 }
 
@@ -780,11 +872,7 @@ get_diabetic_status = function(df,df_f) {
     }
     
   } else {
-    if (df['ever_had_diab'] == 1) {
-      return("Diabetic")
-    } else {
-      return("Not Diabetic")
-    }
+    return("Not Diabetic")
   }
 }
 
@@ -797,18 +885,22 @@ get_cholestrol_status = function(df,df_f) {
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
-    if (df_visits[1,'f_trig'] >= 1.7 | (df_visits[1,'f_hdl_chol'] < 0.9 & df_visits[1,'gender']=="Male") | (df_visits[1,'f_hdl_chol'] < 1.0 & df_visits[1,'gender']=="Female")) {
-      return("High Cholestrol")
+    if (df_visits[1,'f_hdl_chol'] !=-9) {
+      if (df_visits[1,'f_trig'] >= 1.7 | (df_visits[1,'f_hdl_chol'] < 0.9 & df_visits[1,'gender']=="Male") | (df_visits[1,'f_hdl_chol'] < 1.0 & df_visits[1,'gender']=="Female")) {
+        return("High Cholestrol")
+      } else {
+        return("Not High Cholestrol")
+      }
     } else {
-      return("Not High Cholestrol")
+      if (df_visits[1,'f_trig'] >= 1.7 ) {
+        return("High Cholestrol")
+      } else {
+        return("Not High Cholestrol")
+      }
     }
     
   } else {
-    if (df['ever_had_chol'] == 1) {
-      return("High Cholestrol")
-    } else {
-      return("Not High Cholestrol")
-    }
+    return("Not High Cholestrol")
   }
 }
 
@@ -831,23 +923,17 @@ get_bmi_status = function(df,df_f) {
     }
     
   } else {
-    if (df['bmi'] >= 30) {
-      return("Obese")
-    } else if (df['bmi'] >= 25) {
-      return("Overweight")
-    } else {
-      return("Normal weight")
-    }
+    return("Normal weight")
   }
 }
 
 create_retention_data = function(df_enr, df_fu) {
   df_final <- df_enr
   df_final$last_seen = apply(df_final, 1, get_date_last_seen, df_f = df_fu)
-  df_final$hypertension_status = apply(df_final, 1, get_hyptension_status, df_f = df_fu)
-  df_final$diabetic_status = apply(df_final, 1, get_diabetic_status, df_f = df_fu)
-  df_final$cholestrol_status = apply(df_final, 1, get_cholestrol_status, df_f = df_fu)
-  df_final$bmi_status = apply(df_final, 1, get_bmi_status, df_f = df_fu)
+  df_final$hyp_status_1 = apply(df_final, 1, get_hyptension_status, df_f = df_fu)
+  df_final$diab_status_1 = apply(df_final, 1, get_diabetic_status, df_f = df_fu)
+  df_final$chol_status_1 = apply(df_final, 1, get_cholestrol_status, df_f = df_fu)
+  df_final$bmi_status_1 = apply(df_final, 1, get_bmi_status, df_f = df_fu)
   
   six_months_ago = Sys.Date() - 180
   
@@ -855,7 +941,7 @@ create_retention_data = function(df_enr, df_fu) {
                          ifelse(as.Date(as.character(last_seen)) < six_months_ago, 'Not Retained (no visit 6 mo)', 'Retained'))
   
   df_final <- df_final %>%
-    select(studyid, gender, last_seen, retention_status, hypertension_status, cholestrol_status, diabetic_status, bmi_status)
+    select(studyid, gender, last_seen, retention_status, hyp_status_1, bmi_status_1, diab_status_1, bmi_status_1)
   
   return(df_final)
 }

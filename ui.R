@@ -76,9 +76,9 @@ ui <- dashboardPage(
                 
                 box(title="Monthly Enrollment Progress", 
                     htmlOutput("enroll_sub"),
-                    plotlyOutput("plot2_enrollment")
-                    #div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
-                    #downloadButton("download1","Download csv")
+                    plotlyOutput("plot2_enrollment"),
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('enrollment_list')),
+                    downloadButton("download1","Download csv")
                 )
               )
               ),
@@ -105,7 +105,7 @@ ui <- dashboardPage(
               h2("Follow-up Visits Summary"),
               fluidRow(
                 # Dynamic valueBoxes
-                valueBoxOutput("month_1"),
+                valueBoxOutput("weight_1"),
                 
                 valueBoxOutput("month_3"),
                 valueBoxOutput("month_6")
@@ -125,7 +125,7 @@ ui <- dashboardPage(
                 ),
                 box(status = 'primary', solidHeader = TRUE,title = 'Incidence',
                     selectInput("fu_incidence_selection", label = "Sub Category: ",
-                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Overweight','Obesity'))
+                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Overweight','Obesity', 'Weight Change'))
                     
                 )
               ),

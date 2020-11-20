@@ -59,11 +59,18 @@ df_enr$vmonth <- paste(year(as.Date(as.character(df_enr$enrdate))),month(as.Date
 df_enr <- set_age_group(df_enr, df_scr)
 
 df_enr$bmi <- apply(df_enr, 1, calculate_bmi)
+df_enr$hyp_status_0 <- apply(df_enr, 1, get_hyptension_status_baseline)
+df_enr$chol_status_0 <- apply(df_enr, 1, get_cholestrol_status_baseline)
+df_enr$diab_status_0 <- apply(df_enr, 1, get_diabetic_status_baseline)
 
 df_enr_temp <- df_enr %>%
-  select(studyid, height)
+  select(studyid, height, weight)
 
 df_followup$bmi <- apply(df_followup, 1, calculate_bmi_fu, df_en = df_enr_temp)
+df_followup$weight_change <- apply(df_followup, 1, calculate_weight_change, df_en = df_enr_temp)
+df_followup$hyp_status_1 <- apply(df_followup, 1, get_hyptension_status_baseline)
+df_followup$chol_status_1 <- apply(df_followup, 1, get_cholestrol_status_baseline)
+df_followup$diab_status_1 <- apply(df_followup, 1, get_diabetic_status_baseline)
 
 df_retention <- create_retention_data(df_enr, df_followup)
 
@@ -218,7 +225,7 @@ server <- function(input, output, session) {
    output$male <- renderValueBox({
      m <- length(enrollment_data()[enrollment_data()$gender=="Male",]$studyid)
      t<-length(enrollment_data()$studyid)
-     result <- 100*m/t
+     result <- round(100*m/t,1)
      valueBox(
        
        paste0(result,"%","(",m,"/",t,")"), "Proportion of Male Enrolled", icon = icon("male", lib = "glyphicon"),
@@ -227,31 +234,31 @@ server <- function(input, output, session) {
    })
    
    output$hypertensive <- renderValueBox({
-     m <- length(enrollment_data()[enrollment_data()$ever_had_hyp==1,]$studyid)
+     m <- length(enrollment_data()[enrollment_data()$hyp_status_0=="Hypertensive",]$studyid)
      t<-length(enrollment_data()$studyid)
-     result <- 100*m/t
+     result <- round(100*m/t,1)
      valueBox(
        
-       paste0(result,"%","(",m,"/",t,")"), "Proportion Hypertensive", icon = icon("male", lib = "glyphicon"),
+       paste0(result,"%","(",m,"/",t,")"), "Proportion Hypertensive", 
        color = "green"
      )
    })
    
    output$diabetic <- renderValueBox({
-     m <- length(enrollment_data()[enrollment_data()$ever_had_diab==1,]$studyid)
+     m <- length(enrollment_data()[enrollment_data()$diab_status_0=='Diabetic',]$studyid)
      t<-length(enrollment_data()$studyid)
-     result <- 100*m/t
+     result <- round(100*m/t,1)
      valueBox(
        
-       paste0(result,"%","(",m,"/",t,")"), "Proportion Diabetic", icon = icon("male", lib = "glyphicon"),
+       paste0(result,"%","(",m,"/",t,")"), "Proportion Diabetic", 
        color = "aqua"
      )
    })
    
    output$cholestrol <- renderValueBox({
-     m <- length(enrollment_data()[enrollment_data()$ever_had_chol==1,]$studyid)
+     m <- length(enrollment_data()[enrollment_data()$chol_status_0=='High Cholestrol',]$studyid)
      t<-length(enrollment_data()$studyid)
-     result <- 100*m/t
+     result <- round(100*m/t,1)
      valueBox(
        
        paste0(result,"%","(",m,"/",t,")"), "Proportion with High Cholestrol", icon = icon("male", lib = "glyphicon"),
@@ -262,7 +269,7 @@ server <- function(input, output, session) {
    output$bmi <- renderValueBox({
      m <- length(enrollment_data()[enrollment_data()$bmi>=30.0,]$studyid)
      t<-length(enrollment_data()$studyid)
-     result <- 100*m/t
+     result <- round(100*m/t,1)
      valueBox(
        
        paste0(result,"%","(",m,"/",t,")"), "Proportion with Obesity",
@@ -278,13 +285,20 @@ server <- function(input, output, session) {
      ret_val <- df_followup
    })
    
-   output$month_1 <- renderValueBox({
+   output$weight_1 <- renderValueBox({
      t<-length(enrollment_data()$studyid)
-     n <- length(follow_up_data()[follow_up_data()$fuvnumber==1,]$studyid)
+     
+     n <- follow_up_data() %>%
+       filter(weight_change >= 5.0 | weight_change >= -5.0) %>%
+       filter(!duplicated(studyid)) %>%
+       count()
+       
+     #length(follow_up_data()[follow_up_data()$weight_change>=5.0,]$studyid)
+     
      result <- round(100 * n/t,1)
      valueBox(
        
-       paste0(result,"%","(",n,"/",t,")"), "Proportion seen for Month 1 follow-up Visit",
+       paste0(result,"%","(",n,"/",t,")"), "At least -5% or 5% Weight Change ",
        color = "green"
      )
    })
@@ -312,14 +326,21 @@ server <- function(input, output, session) {
    })
    
    output$new_hypertenstion <- renderValueBox({
-     t<-length(enrollment_data()$studyid)
+     # get all non hypertensive at baseline or enrollment
+     t <- enrollment_data() %>%
+       filter(hyp_status_0 == "Not Hypertensive") %>%
+       count()
+     
      known_hyp_df <- enrollment_data() %>%
-       filter(ever_had_hyp == 1)
+       filter(hyp_status_0 == "Hypertensive")
      
      n <- follow_up_data() %>%
-       filter((bp_systolic_1 >= 140 | bp_diastolic_1 >= 90), !(studyid %in% known_hyp_df$studyid)) %>%
+       filter((hyp_status_1 == "Hypertensive"), !(studyid %in% known_hyp_df$studyid)) %>%
+       arrange(desc(studyid)) %>%
+       filter(!duplicated(studyid)) %>%
        count()
      result <- round(100 * n/t,1)
+     
      valueBox(
        
        paste0(result,"%","(",n,"/",t,")"), "New Hypertensive",
@@ -329,12 +350,17 @@ server <- function(input, output, session) {
    
    output$new_diabetic <- renderValueBox({
      
-     t<-length(enrollment_data()$studyid)
+     t<-enrollment_data() %>%
+       filter(diab_status_0 %in% c("Not Diabetic", "Unknown")) %>%
+       count()
+     
      known_diab_df <- enrollment_data() %>%
-       filter(ever_had_diab == 1)
+       filter(diab_status_0 == "Diabetic")
      
      n <- follow_up_data() %>%
-       filter((f_glucose >= 7.0 | hgb >= 6.5), !(studyid %in% known_diab_df$studyid)) %>%
+       filter(diab_status_1 == "Diabetic", !(studyid %in% known_diab_df$studyid)) %>%
+       arrange(desc(studyid)) %>%
+       filter(!duplicated(studyid)) %>%
        count()
      result <- round(100 * n/t,1)
      valueBox(
@@ -347,13 +373,19 @@ server <- function(input, output, session) {
    
    
    output$new_cholestrol <- renderValueBox({
-     t<-length(enrollment_data()$studyid)
+     t <- enrollment_data() %>%
+       filter(chol_status_0 %in% c("Not High Cholestrol")) %>%
+       count()
+     
      known_chol_df <- enrollment_data() %>%
-       filter(ever_had_chol == 1)
+       filter(chol_status_0 == "High Cholestrol")
      
      n <- follow_up_data() %>%
-       filter((f_trig >= 1.7 | (f_hdl_chol < 0.9 & gender=="Male") | (f_hdl_chol < 1.0 & gender=="Female")), !(studyid %in% known_chol_df$studyid)) %>%
+       filter(chol_status_1 == "High Cholestrol", !(studyid %in% known_chol_df$studyid)) %>%
+       arrange(desc(studyid)) %>%
+       filter(!duplicated(studyid)) %>%
        count()
+     
      result <- round(100 * n/t,1)
      valueBox(
        
@@ -367,8 +399,8 @@ server <- function(input, output, session) {
    # Add downloadable list
    df_temp_fu <- reactive({
      ret_value <- df_followup %>%
-       select(studyid, clinicid,gender,vdate,fuvnumber, weight_change,weight, bp_systolic_1,bp_diastolic_1,next_visit_date,
-              hgb, f_glucose, f_hdl_chol,f_trig, bmi 
+       select(studyid, clinicid,gender,vdate,fuvnumber, weight_change,weight, hyp_status_1,diab_status_1,next_visit_date,
+              chol_status_1, bmi 
               )
      
    })
@@ -403,17 +435,17 @@ server <- function(input, output, session) {
      if (input$fu_incidence_selection == "Hypertensive") {
        
        dt <- df_temp_fu() %>%
-         filter(bp_systolic_1 >=140 | bp_diastolic_1 >= 90)
+         filter(hyp_status_1 == "Hypertensive")
        
      } else if (input$fu_incidence_selection == "Diabetic") {
        
        dt <- df_temp_fu() %>%
-         filter(f_glucose >= 7.0 | hgb >= 6.5)
+         filter(diab_status_1 == "Diabetic")
        
      } else if (input$fu_incidence_selection == "High Cholestrol") {
        
        dt <- df_temp_fu() %>%
-         filter(f_trig >= 1.7 | (f_hdl_chol < 0.9 & gender=="Male") | (f_hdl_chol < 1.0 & gender=="Female"))
+         filter(chol_status_1 == "High Cholestrol")
        
      } else if (input$fu_incidence_selection == "Obesity") {
        
@@ -424,6 +456,11 @@ server <- function(input, output, session) {
        
        dt <- df_temp_fu() %>%
          filter(bmi>=25)
+       
+     }  else if (input$fu_incidence_selection == "Weight Change") {
+       
+       dt <- df_temp_fu() %>%
+         filter(weight_change>=5.0 | weight_change <= -5.0)
        
      } else {
        dt <- df_temp_fu()
@@ -541,13 +578,13 @@ server <- function(input, output, session) {
     } else if (input$breakdown == "Pre-conditions") {
       if(input$subcategory == "Hypertensive") {
         df <- df_enr %>%
-          filter(ever_had_hyp == 1)
+          filter(hyp_status_0 == "Hypertensive")
       } else if(input$subcategory == "Diabetic") {
         df <- df_enr %>%
-          filter(ever_had_diab == 1)
+          filter(diab_status_0 == "Diabetic")
       } else if(input$subcategory == "Cholestrol") {
         df <- df_enr %>%
-          filter(ever_had_chol == 1)
+          filter(chol_status_0 == "High Cholestrol")
       } else if(input$subcategory == "Obesity") {
         df <- df_enr %>%
           filter(bmi >= 30.0)
@@ -582,13 +619,13 @@ server <- function(input, output, session) {
     } else if (input$breakdown == "Pre-conditions") {
       if(input$subcategory == "Hypertensive") {
         df <- df_enr %>%
-          filter(ever_had_hyp == 1)
+          filter(hyp_status_0 == "Hypertensive")
       } else if(input$subcategory == "Diabetic") {
         df <- df_enr %>%
-          filter(ever_had_diab == 1)
+          filter(diab_status_0 == "Diabetic")
       } else if(input$subcategory == "Cholestrol") {
         df <- df_enr %>%
-          filter(ever_had_chol == 1)
+          filter(chol_status_0 == "High Cholestrol")
       } else if(input$subcategory == "Obesity") {
         df <- df_enr %>%
           filter(bmi >= 30.0)
@@ -610,7 +647,7 @@ server <- function(input, output, session) {
   df_temp <- reactive({
     ret_value <- enrollment_data() %>%
       select(studyid, clinicid,pinitials,gender,enrdate,dtg_start_date, year_diagnosed,year_start_art, age,height,weight,age_group,
-             bmi, ever_had_hyp,ever_had_diab,ever_had_chol)
+             bmi, hyp_status_0,diab_status_0,chol_status_0)
     
   })
   
@@ -632,13 +669,13 @@ server <- function(input, output, session) {
    } else if (input$breakdown == "Pre-conditions") {
      if(input$subcategory == "Hypertensive") {
        dt <- df_temp() %>%
-         filter(ever_had_hyp == 1)
+         filter(hyp_status_0 == "Hypertensive")
      } else if(input$subcategory == "Diabetic") {
        dt <- df_temp() %>%
-         filter(ever_had_diab == 1)
+         filter(diab_status_0 == "Diabetic")
      } else if(input$subcategory == "Cholestrol") {
        dt <- df_temp() %>%
-         filter(ever_had_chol == 1)
+         filter(chol_status_0 == "High Cholestrol")
      } else if(input$subcategory == "Obesity") {
        dt <- df_temp() %>%
          filter(bmi >= 30.0)
@@ -1034,7 +1071,7 @@ server <- function(input, output, session) {
     df_retained <- dt %>%
       filter(gender == 'Male')
     
-    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
     
     valueBox(
       paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Male Proportion Retained",
@@ -1047,9 +1084,9 @@ server <- function(input, output, session) {
       filter(!duplicated(studyid))
     
     df_retained <- dt %>%
-      filter(hypertension_status == 'Hypertensive')
+      filter(hyp_status_1 == 'Hypertensive')
     
-    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
     
     valueBox(
       paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Hypertensive Proportion Retained",
@@ -1064,7 +1101,7 @@ server <- function(input, output, session) {
     df_retained <- dt %>%
       filter(retention_status == 'Retained')
     
-    proption <- 100 * length(df_retained$studyid)/ length(dt$studyid)
+    proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
     valueBox(
       paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Proportion Retained",
       color = "aqua"
@@ -1091,7 +1128,7 @@ server <- function(input, output, session) {
     df <- df_retention
     
     
-    p<-ggplot(df, aes(x=retention_status,fill=hypertension_status)) +
+    p<-ggplot(df, aes(x=retention_status,fill=hyp_status_1)) +
       xlab("") +
       geom_bar(stat = "count") +
       theme_minimal()
