@@ -60,7 +60,7 @@ df_enr <- set_age_group(df_enr, df_scr)
 
 df_enr$bmi <- apply(df_enr, 1, calculate_bmi)
 df_enr$hyp_status_0 <- apply(df_enr, 1, get_hyptension_status_baseline)
-df_enr$chol_status_0 <- apply(df_enr, 1, get_cholestrol_status_baseline)
+df_enr$chol_status_0 <- apply(df_enr, 1, get_cholesterol_status_baseline)
 df_enr$diab_status_0 <- apply(df_enr, 1, get_diabetic_status_baseline)
 
 df_enr_temp <- df_enr %>%
@@ -69,7 +69,7 @@ df_enr_temp <- df_enr %>%
 df_followup$bmi <- apply(df_followup, 1, calculate_bmi_fu, df_en = df_enr_temp)
 df_followup$weight_change <- apply(df_followup, 1, calculate_weight_change, df_en = df_enr_temp)
 df_followup$hyp_status_1 <- apply(df_followup, 1, get_hyptension_status_baseline)
-df_followup$chol_status_1 <- apply(df_followup, 1, get_cholestrol_status_baseline)
+df_followup$chol_status_1 <- apply(df_followup, 1, get_cholesterol_status_baseline)
 df_followup$diab_status_1 <- apply(df_followup, 1, get_diabetic_status_baseline)
 
 df_retention <- create_retention_data(df_enr, df_followup)
@@ -255,13 +255,13 @@ server <- function(input, output, session) {
      )
    })
    
-   output$cholestrol <- renderValueBox({
-     m <- length(enrollment_data()[enrollment_data()$chol_status_0=='High Cholestrol',]$studyid)
+   output$cholesterol <- renderValueBox({
+     m <- length(enrollment_data()[enrollment_data()$chol_status_0=='High Cholesterol',]$studyid)
      t<-length(enrollment_data()$studyid)
      result <- round(100*m/t,1)
      valueBox(
        
-       paste0(result,"%","(",m,"/",t,")"), "Proportion with High Cholestrol", icon = icon("male", lib = "glyphicon"),
+       paste0(result,"%","(",m,"/",t,")"), "Proportion with High Cholesterol", icon = icon("male", lib = "glyphicon"),
        color = "green"
      )
    })
@@ -372,16 +372,16 @@ server <- function(input, output, session) {
    })
    
    
-   output$new_cholestrol <- renderValueBox({
+   output$new_cholesterol <- renderValueBox({
      t <- enrollment_data() %>%
-       filter(chol_status_0 %in% c("Not High Cholestrol")) %>%
+       filter(chol_status_0 %in% c("Not High Cholesterol")) %>%
        count()
      
      known_chol_df <- enrollment_data() %>%
-       filter(chol_status_0 == "High Cholestrol")
+       filter(chol_status_0 == "High Cholesterol")
      
      n <- follow_up_data() %>%
-       filter(chol_status_1 == "High Cholestrol", !(studyid %in% known_chol_df$studyid)) %>%
+       filter(chol_status_1 == "High Cholesterol", !(studyid %in% known_chol_df$studyid)) %>%
        arrange(desc(studyid)) %>%
        filter(!duplicated(studyid)) %>%
        count()
@@ -389,7 +389,7 @@ server <- function(input, output, session) {
      result <- round(100 * n/t,1)
      valueBox(
        
-       paste0(result,"%","(",n,"/",t,")"), "New High Cholestrol",
+       paste0(result,"%","(",n,"/",t,")"), "New High Cholesterol",
        color = "yellow"
      )
    })
@@ -442,10 +442,10 @@ server <- function(input, output, session) {
        dt <- df_temp_fu() %>%
          filter(diab_status_1 == "Diabetic")
        
-     } else if (input$fu_incidence_selection == "High Cholestrol") {
+     } else if (input$fu_incidence_selection == "High Cholesterol") {
        
        dt <- df_temp_fu() %>%
-         filter(chol_status_1 == "High Cholestrol")
+         filter(chol_status_1 == "High Cholesterol")
        
      } else if (input$fu_incidence_selection == "Obesity") {
        
@@ -544,7 +544,7 @@ server <- function(input, output, session) {
       pref_choices <- c("All","25-34", "35-44", "45-54", "55-64", "65+")
       select_label <- "Select Age Group"
     } else if (selected_option == "Pre-conditions"){
-      pref_choices <- c("All","Hypertensive", "Diabetic", "Cholestrol", "Obesity")
+      pref_choices <- c("All","Hypertensive", "Diabetic", "Cholesterol", "Obesity")
       select_label <- "Select Pre-Existing Conditions"
     }else {
       pref_choices <- c("All")
@@ -582,9 +582,9 @@ server <- function(input, output, session) {
       } else if(input$subcategory == "Diabetic") {
         df <- df_enr %>%
           filter(diab_status_0 == "Diabetic")
-      } else if(input$subcategory == "Cholestrol") {
+      } else if(input$subcategory == "Cholesterol") {
         df <- df_enr %>%
-          filter(chol_status_0 == "High Cholestrol")
+          filter(chol_status_0 == "High Cholesterol")
       } else if(input$subcategory == "Obesity") {
         df <- df_enr %>%
           filter(bmi >= 30.0)
@@ -623,9 +623,9 @@ server <- function(input, output, session) {
       } else if(input$subcategory == "Diabetic") {
         df <- df_enr %>%
           filter(diab_status_0 == "Diabetic")
-      } else if(input$subcategory == "Cholestrol") {
+      } else if(input$subcategory == "Cholesterol") {
         df <- df_enr %>%
-          filter(chol_status_0 == "High Cholestrol")
+          filter(chol_status_0 == "High Cholesterol")
       } else if(input$subcategory == "Obesity") {
         df <- df_enr %>%
           filter(bmi >= 30.0)
@@ -673,9 +673,9 @@ server <- function(input, output, session) {
      } else if(input$subcategory == "Diabetic") {
        dt <- df_temp() %>%
          filter(diab_status_0 == "Diabetic")
-     } else if(input$subcategory == "Cholestrol") {
+     } else if(input$subcategory == "Cholesterol") {
        dt <- df_temp() %>%
-         filter(chol_status_0 == "High Cholestrol")
+         filter(chol_status_0 == "High Cholesterol")
      } else if(input$subcategory == "Obesity") {
        dt <- df_temp() %>%
          filter(bmi >= 30.0)
@@ -702,13 +702,19 @@ server <- function(input, output, session) {
   output$enroll_text_summary <- renderUI({
     m <-gender_summary()[gender_summary()$gender=='Male','N']
     f <-gender_summary()[gender_summary()$gender=='Female','N']
-    m_percent <- 100*m/(f+m)
-    f_percent <- 100*f/(f+m)
+    
+    m <- ifelse(is.na(as.integer(m)),0,as.integer(m))
+    f <- ifelse(is.na(as.integer(f)),0,as.integer(f))
+    #print(paste(m,f))
+    t <- f + m
+    
+    m_percent <- 100*m/t
+    f_percent <- 100*f/t
     HTML(paste("<font size='4'>",
                sprintf("Male %.1f",m_percent),"%", 
-               sprintf("(%s/%s) and ",m,f+m),
+               sprintf("(%s/%s) and ",m,t),
                sprintf("Female %.1f",f_percent),"%",
-               sprintf("(%s/%s) ",f,f+m),
+               sprintf("(%s/%s) ",f,t),
                "</font><br><br>"))
   })
   

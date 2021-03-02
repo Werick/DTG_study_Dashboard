@@ -53,7 +53,7 @@ ui <- dashboardPage(
                 valueBoxOutput("hypertensive"),
                 
                 valueBoxOutput("diabetic"),
-                valueBoxOutput("cholestrol")
+                valueBoxOutput("cholesterol")
               ),
               fluidRow(
                 
@@ -115,7 +115,7 @@ ui <- dashboardPage(
                 valueBoxOutput("new_hypertenstion"),
                 
                 valueBoxOutput("new_diabetic"),
-                valueBoxOutput("new_cholestrol")
+                valueBoxOutput("new_cholesterol")
               ),
               fluidRow(
                 
@@ -125,7 +125,7 @@ ui <- dashboardPage(
                 ),
                 box(status = 'primary', solidHeader = TRUE,title = 'Incidence',
                     selectInput("fu_incidence_selection", label = "Sub Category: ",
-                                choices = c('All','Diabetic','Hypertensive','High Cholestrol','Overweight','Obesity', 'Weight Change'))
+                                choices = c('All','Diabetic','Hypertensive','High Cholesterol','Overweight','Obesity', 'Weight Change'))
                     
                 )
               ),
