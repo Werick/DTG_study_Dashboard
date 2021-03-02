@@ -31,23 +31,32 @@ get_hyptension_status_baseline <- function(df) {
   hyp_status2 = FALSE
   hyp_status3 = FALSE
   
-  if (df['bp_systolic_3'] != -6 | df['bp_diastolic_3'] != -6) {
-    if (df['bp_systolic_3'] >= 140 | df['bp_diastolic_3'] >= 90) {
-      hyp_status3 = TRUE
+  
+  if (!is.na(df['bp_systolic_3'] != "-6") | !is.na(df['bp_diastolic_3']) ) {
+    if (df['bp_systolic_3'] != "-6" | df['bp_diastolic_3'] != "-6") {
+      if (df['bp_systolic_3'] >= 140 | df['bp_diastolic_3'] >= 90) {
+        hyp_status3 = TRUE
+      }
     }
   }
   
-  if (df['bp_systolic_2'] != -6 | df['bp_diastolic_2'] != -6) {
-    if (df['bp_systolic_2'] >= 140 | df['bp_diastolic_2'] >= 90) {
-      hyp_status2 = TRUE
+  if (!is.na(df['bp_systolic_2'] != "-6") | !is.na(df['bp_diastolic_2']) ) {
+    if (df['bp_systolic_2'] != "-6" | df['bp_diastolic_2'] != "-6") {
+      if (df['bp_systolic_2'] >= 140 | df['bp_diastolic_2'] >= 90) {
+        hyp_status2 = TRUE
+      }
     }
   }
   
-  if (df['bp_systolic_1'] != -6 | df['bp_diastolic_1'] != -6) {
-    if (df['bp_systolic_1'] >= 140 | df['bp_diastolic_1'] >= 90) {
-      hyp_status1 = TRUE
+  
+  if (!is.na(df['bp_systolic_1'] != "-6") | !is.na(df['bp_diastolic_1']) ){
+    if (df['bp_systolic_1'] != -6 | df['bp_diastolic_1'] != -6) {
+      if (df['bp_systolic_1'] >= 140 | df['bp_diastolic_1'] >= 90) {
+        hyp_status1 = TRUE
+      }
     }
   }
+  
   
   if (hyp_status1 & hyp_status2 & hyp_status3) {
     return("Hypertensive")
@@ -57,21 +66,23 @@ get_hyptension_status_baseline <- function(df) {
   
 }
 
-# Get High Cholestrol status
-get_cholestrol_status_baseline = function(df) {
+# Get High Cholesterol status
+get_cholesterol_status_baseline = function(df) {
   
-  if (df['f_hdl_chol'] != -9) {
+  if (!is.na(df['f_hdl_chol']) & !(as.integer(df['f_hdl_chol']) %in% c(-9,-6))) {
+    #print(paste('Route1', df['f_trig']))
     if (df['f_trig'] >= 1.7 | (df['f_hdl_chol'] < 0.9 & df['gender']=="Male") | (df['f_hdl_chol'] < 1.0 & df['gender']=="Female")) {
-      return("High Cholestrol")
+      return("High Cholesterol")
     } else {
-      return("Not High Cholestrol")
+      return("Not High Cholesterol")
     }
     
   } else {
-    if (df['f_trig'] >= 1.7) {
-      return("High Cholestrol")
+    if (!is.na(df['f_trig']) & as.integer(df['f_trig']) >= 1.7) {
+      #print(paste('Route2', df['f_trig']))
+      return("High Cholesterol")
     } else {
-      return("Not High Cholestrol")
+      return("Not High Cholesterol")
     }
   }  
   
@@ -80,14 +91,19 @@ get_cholestrol_status_baseline = function(df) {
 # Get Diabetic status
 get_diabetic_status_baseline = function(df) {
   
-  if (df['f_glucose'] ==-9 & df['hgb'] == -9) {
-    return("Unknown")
-    
+  if (!is.na(df['f_glucose']) & !is.na(df['hgb'])) {
+    if (df['f_glucose'] ==-9 & df['hgb'] == -9) {
+      return("Unknown")
+      
     } else if (df['f_glucose'] >= 7.0 | df['hgb'] >= 6.6) {
       return("Diabetic")
     } else {
       return("Not Diabetic")
     }
+  } else {
+    return("Not Diabetic")
+  }
+  
   
 }
 
@@ -349,7 +365,7 @@ get_medication_history <- function(df_enr, study_id) {
   hyp_year <- ifelse(df_select_enr$year_diagnosed_hyp==-9, "N/A",df_select_enr$year_diagnosed_hyp)
   taken_hyp_meds <- ifelse(df_select_enr$ever_taken_hyp_meds==1,"Yes","No")
   
-  cholestrol <- ifelse(df_select_enr$ever_had_chol==1, "Yes", "No")
+  cholesterol <- ifelse(df_select_enr$ever_had_chol==1, "Yes", "No")
   chol_year <- ifelse(df_select_enr$year_diagnosed_chol==-9, "N/A",df_select_enr$year_diagnosed_chol)
   taken_chol_meds <- ifelse(df_select_enr$ever_taken_chol_meds==1,"Yes","No")
   
@@ -370,11 +386,11 @@ get_medication_history <- function(df_enr, study_id) {
                  ", hyp,hyp_year, taken_hyp_meds)
   
   history_3 <- sprintf("
-            <b><u>Cholestrol/dyslipidemia History </u> </b> <br>
-            <b> Ever diagnosed with high Cholestrol </b> : %s <br>
-            <b> Year diagnosed with high Cholestrol </b> : %s <br>
-            <b> Ever taken meds for high Cholestrol </b> : %s <br>
-                 ", cholestrol,chol_year, taken_chol_meds)
+            <b><u>Cholesterol/dyslipidemia History </u> </b> <br>
+            <b> Ever diagnosed with high Cholesterol </b> : %s <br>
+            <b> Year diagnosed with high Cholesterol </b> : %s <br>
+            <b> Ever taken meds for high Cholesterol </b> : %s <br>
+                 ", cholesterol,chol_year, taken_chol_meds)
   
   return(c(history_1, history_2, history_3))
 }
@@ -877,30 +893,30 @@ get_diabetic_status = function(df,df_f) {
 }
 
 
-# Get High Cholestrol status
-get_cholestrol_status = function(df,df_f) {
+# Get High Cholesterol status
+get_cholesterol_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (f_trig != -9 | f_hdl_chol != -9 | f_hdl_chol != -9)) %>%
+    filter(studyid == df['studyid'], (as.integer(f_trig)  != -9 | as.integer(f_hdl_chol) != -9 | as.integer(f_hdl_chol) != -9)) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
     if (df_visits[1,'f_hdl_chol'] !=-9) {
       if (df_visits[1,'f_trig'] >= 1.7 | (df_visits[1,'f_hdl_chol'] < 0.9 & df_visits[1,'gender']=="Male") | (df_visits[1,'f_hdl_chol'] < 1.0 & df_visits[1,'gender']=="Female")) {
-        return("High Cholestrol")
+        return("High Cholesterol")
       } else {
-        return("Not High Cholestrol")
+        return("Not High Cholesterol")
       }
     } else {
       if (df_visits[1,'f_trig'] >= 1.7 ) {
-        return("High Cholestrol")
+        return("High Cholesterol")
       } else {
-        return("Not High Cholestrol")
+        return("Not High Cholesterol")
       }
     }
     
   } else {
-    return("Not High Cholestrol")
+    return("Not High Cholesterol")
   }
 }
 
@@ -932,7 +948,7 @@ create_retention_data = function(df_enr, df_fu) {
   df_final$last_seen = apply(df_final, 1, get_date_last_seen, df_f = df_fu)
   df_final$hyp_status_1 = apply(df_final, 1, get_hyptension_status, df_f = df_fu)
   df_final$diab_status_1 = apply(df_final, 1, get_diabetic_status, df_f = df_fu)
-  df_final$chol_status_1 = apply(df_final, 1, get_cholestrol_status, df_f = df_fu)
+  df_final$chol_status_1 = apply(df_final, 1, get_cholesterol_status, df_f = df_fu)
   df_final$bmi_status_1 = apply(df_final, 1, get_bmi_status, df_f = df_fu)
   
   six_months_ago = Sys.Date() - 180
