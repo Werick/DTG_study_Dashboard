@@ -32,26 +32,26 @@ get_hyptension_status_baseline <- function(df) {
   hyp_status3 = FALSE
   
   
-  if (!is.na(df['bp_systolic_3'] != "-6") | !is.na(df['bp_diastolic_3']) ) {
-    if (df['bp_systolic_3'] != "-6" | df['bp_diastolic_3'] != "-6") {
-      if (df['bp_systolic_3'] >= 140 | df['bp_diastolic_3'] >= 90) {
+  if (!is.na(df['bp_diastolic_3']) ) {
+    if (as.integer(df['bp_systolic_3'])  != -6 | as.integer(df['bp_diastolic_3']) != -6) {
+      if (as.integer(df['bp_systolic_3']) >= 140 | as.integer(df['bp_diastolic_3']) >= 90) {
         hyp_status3 = TRUE
       }
     }
   }
   
-  if (!is.na(df['bp_systolic_2'] != "-6") | !is.na(df['bp_diastolic_2']) ) {
-    if (df['bp_systolic_2'] != "-6" | df['bp_diastolic_2'] != "-6") {
-      if (df['bp_systolic_2'] >= 140 | df['bp_diastolic_2'] >= 90) {
+  if (!is.na(df['bp_diastolic_2']) ) {
+    if (as.integer(df['bp_systolic_2'])  != -6 | as.integer(df['bp_diastolic_2']) != -6) {
+      if (as.integer(df['bp_systolic_2']) >= 140 | as.integer(df['bp_diastolic_2']) >= 90) {
         hyp_status2 = TRUE
       }
     }
   }
   
   
-  if (!is.na(df['bp_systolic_1'] != "-6") | !is.na(df['bp_diastolic_1']) ){
-    if (df['bp_systolic_1'] != -6 | df['bp_diastolic_1'] != -6) {
-      if (df['bp_systolic_1'] >= 140 | df['bp_diastolic_1'] >= 90) {
+  if (!is.na(df['bp_diastolic_1']) ) {
+    if (as.integer(df['bp_systolic_1'])  != -6 | as.integer(df['bp_diastolic_1']) != -6) {
+      if (as.integer(df['bp_systolic_1']) >= 140 | as.integer(df['bp_diastolic_1']) >= 90) {
         hyp_status1 = TRUE
       }
     }
@@ -71,14 +71,14 @@ get_cholesterol_status_baseline = function(df) {
   
   if (!is.na(df['f_hdl_chol']) & !(as.integer(df['f_hdl_chol']) %in% c(-9,-6))) {
     #print(paste('Route1', df['f_trig']))
-    if (df['f_trig'] >= 1.7 | (df['f_hdl_chol'] < 0.9 & df['gender']=="Male") | (df['f_hdl_chol'] < 1.0 & df['gender']=="Female")) {
+    if (as.double(df['f_trig']) >= 1.7 | (as.double(df['f_hdl_chol']) < 0.9 & df['gender']=="Male") | (as.double(df['f_hdl_chol']) < 1.0 & df['gender']=="Female")) {
       return("High Cholesterol")
     } else {
       return("Not High Cholesterol")
     }
     
   } else {
-    if (!is.na(df['f_trig']) & as.integer(df['f_trig']) >= 1.7) {
+    if (!is.na(df['f_trig']) & as.double(df['f_trig']) >= 1.7) {
       #print(paste('Route2', df['f_trig']))
       return("High Cholesterol")
     } else {
@@ -92,10 +92,10 @@ get_cholesterol_status_baseline = function(df) {
 get_diabetic_status_baseline = function(df) {
   
   if (!is.na(df['f_glucose']) & !is.na(df['hgb'])) {
-    if (df['f_glucose'] ==-9 & df['hgb'] == -9) {
+    if (as.double(df['f_glucose']) ==-9.0 & as.double(df['hgb']) == -9.0) {
       return("Unknown")
       
-    } else if (df['f_glucose'] >= 7.0 | df['hgb'] >= 6.6) {
+    } else if (as.double(df['f_glucose']) >= 7.0 | as.double(df['hgb']) >= 6.6) {
       return("Diabetic")
     } else {
       return("Not Diabetic")
@@ -846,20 +846,20 @@ get_hyptension_status = function(df,df_f) {
   hyp_status3 = FALSE
   
   if (nrow(df_visits)>0) {
-    if (df_visits[1, 'bp_systolic_3'] != -6 | df_visits[1, 'bp_diastolic_3'] != -6) {
-      if (df_visits[1, 'bp_systolic_3'] >= 140 | df_visits[1, 'bp_diastolic_3'] >= 90) {
+    if (as.integer(df_visits[1, 'bp_systolic_3']) != -6 | as.integer(df_visits[1, 'bp_diastolic_3']) != -6) {
+      if (as.integer(df_visits[1, 'bp_systolic_3']) >= 140 | as.integer(df_visits[1, 'bp_diastolic_3']) >= 90) {
         hyp_status3 = TRUE
       }
     }
     
-    if (df_visits[1, 'bp_systolic_2'] != -6 | df_visits[1, 'bp_diastolic_2'] != -6) {
-      if (df_visits[1, 'bp_systolic_2'] >= 140 | df_visits[1, 'bp_diastolic_2'] >= 90) {
+    if (as.integer(df_visits[1, 'bp_systolic_2']) != -6 | as.integer(df_visits[1, 'bp_diastolic_2']) != -6) {
+      if (as.integer(df_visits[1, 'bp_systolic_2']) >= 140 | as.integer(df_visits[1, 'bp_diastolic_2']) >= 90) {
         hyp_status2 = TRUE
       }
     }
     
-    if (df_visits[1,'bp_systolic_1'] != -6 | df_visits[1,'bp_diastolic_1'] != -6) {
-      if (df_visits[1, 'bp_systolic_1'] >= 140 | df_visits[1,'bp_diastolic_1'] >= 90) {
+    if (as.integer(df_visits[1, 'bp_systolic_1']) != -6 | as.integer(df_visits[1, 'bp_diastolic_1']) != -6) {
+      if (as.integer(df_visits[1, 'bp_systolic_1']) >= 140 | as.integer(df_visits[1, 'bp_diastolic_1']) >= 90) {
         hyp_status1 = TRUE
       }
     }
@@ -877,11 +877,11 @@ get_hyptension_status = function(df,df_f) {
 get_diabetic_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (f_glucose != -9 | hgb != -9)) %>%
+    filter(studyid == df['studyid'], (as.double(f_glucose) != -9.0 | as.double(hgb) != -9.0)) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
-    if (df_visits[1,'f_glucose'] >= 7.0 | df_visits[1,'hgb'] >= 6.6) {
+    if (as.double(df_visits[1,'f_glucose']) >= 7.0 | as.double(df_visits[1,'hgb']) >= 6.6) {
       return("Diabetic")
     } else {
       return("Not Diabetic")
@@ -897,12 +897,12 @@ get_diabetic_status = function(df,df_f) {
 get_cholesterol_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (as.integer(f_trig)  != -9 | as.integer(f_hdl_chol) != -9 | as.integer(f_hdl_chol) != -9)) %>%
+    filter(studyid == df['studyid'], (as.double(f_trig)  != -9.0 | as.double(f_hdl_chol) != -9.0 | as.double(f_hdl_chol) != -9.0)) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
-    if (df_visits[1,'f_hdl_chol'] !=-9) {
-      if (df_visits[1,'f_trig'] >= 1.7 | (df_visits[1,'f_hdl_chol'] < 0.9 & df_visits[1,'gender']=="Male") | (df_visits[1,'f_hdl_chol'] < 1.0 & df_visits[1,'gender']=="Female")) {
+    if (as.double(df_visits[1,'f_hdl_chol']) !=-9.0) {
+      if (as.double(df_visits[1,'f_trig']) >= 1.7 | (as.double(df_visits[1,'f_hdl_chol']) < 0.9 & df_visits[1,'gender']=="Male") | (as.double(df_visits[1,'f_hdl_chol']) < 1.0 & df_visits[1,'gender']=="Female")) {
         return("High Cholesterol")
       } else {
         return("Not High Cholesterol")
@@ -930,9 +930,9 @@ get_bmi_status = function(df,df_f) {
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
-    if (df_visits[1,'bmi'] >= 30) {
+    if (as.integer(df_visits[1,'bmi']) >= 30) {
       return("Obese")
-    } else if (df_visits[1,'bmi'] >= 25){
+    } else if (as.integer(df_visits[1,'bmi']) >= 25){
       return("Overweight")
     } else {
       return("Normal weight")
