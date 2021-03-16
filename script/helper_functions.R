@@ -196,7 +196,7 @@ get_enrollment_details <- function(df_enr, study_id) {
   bp_diastolic_2 <- ifelse(df_selected_enr$bp_diastolic_2 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_2))
   bp_systolic_3 <- ifelse(df_selected_enr$bp_systolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_systolic_3))
   bp_diastolic_3 <- ifelse(df_selected_enr$bp_diastolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_3))
-  tca_fasting_labs <- ifelse(df_selected_enr$tca_fasting_labs== "01/01/2000", as.character(df_selected_enr$next_visit_date), as.character(df_selected_enr$tca_fasting_labs))
+  tca_fasting_labs <- ifelse(as.character(df_selected_enr$tca_fasting_labs) %in% c("01/01/2000","2000-01-01"), as.character(df_selected_enr$next_visit_date), as.character(df_selected_enr$tca_fasting_labs))
   
   return_string1 <- sprintf("
     <u><b>Vitals</b> </u> <br>
