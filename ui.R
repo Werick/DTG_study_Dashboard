@@ -184,6 +184,34 @@ ui <- dashboardPage(
                     downloadButton("download_withdrawal", label = "Download Withdrawal csv")
                 )
               )
+              ),
+      tabItem(tabName = 'qc_report',
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in hemoglobin A1C",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hemoglobin')),
+                    downloadButton("download_hgb", label = "hemoglobinA1C csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Blood Sugar",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('fbs')),
+                    downloadButton("download_fbs", label = "fasting blood sugar csv")
+                )
+              ),
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting total cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('tchol')),
+                    downloadButton("download_ftchol", label = "Fasting total cholesterol csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting HDL cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hdlchol')),
+                    downloadButton("download_fhdlchol", label = "Fasting HDL cholesterol csv")
+                )
+              ),
+              fluidRow(
+               box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Triglycerides ",
+                   div(style = 'overflow-x: scroll', DT::dataTableOutput('ftrig')),
+                    downloadButton("download_trigchol", label = "Fasting Triglycerides csv")
+                )
+              )
               )
       
     )

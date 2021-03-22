@@ -26,6 +26,7 @@ track_filepath <- file.path("data", "tracking.csv")
 withdraw_filepath <- file.path("data", "withdrawal.csv")
 screening_filepath <- file.path("data", "screening.csv")
 followup_filepath <- file.path("data", "followup.csv")
+lab_filepath <- file.path("data", "lab.csv")
 
 
 
@@ -36,13 +37,15 @@ df_scr <- read.csv(file = screening_filepath, stringsAsFactors = FALSE)
 df_trk <- read.csv(file = track_filepath, stringsAsFactors = FALSE)
 df_withdraw <- read.csv(file = withdraw_filepath, stringsAsFactors = FALSE)
 df_followup <- read.csv(file = followup_filepath, stringsAsFactors = FALSE)
+df_lab <- read.csv(file = lab_filepath, stringsAsFactors = FALSE)
 
 df_all_tables <- list(
   "enrollment" = df_enr,
   "screening"  = df_scr,
   "tracking" = df_trk,
   "withdrawal" = df_withdraw,
-  "followup" = df_followup
+  "followup" = df_followup,
+  "lab" = df_lab
 )
 
 # Format columns in the data set
@@ -1212,5 +1215,90 @@ server <- function(input, output, session) {
               callback = JS("$('div.dwnld').append($('#sch_download'));"),
               extensions = 'Buttons')
   })
+  
+  #----------------------------------------------------------------------------
+  # LAB QC REPORTS
+  #----------------------------------------------------------------------------
+  lab_qc <- reactive({
+    ret_val <- baseline_lab_qc(df_enr, df_lab)
+  })
+  
+  # Baseline hemoglobin 1AC
+  output$hemoglobin <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab")
+    
+    dt <- lab_qc()%>%
+      filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab))
+    
+    dt <- dt[, col_order]
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_hgb'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  # Baseline Fasting blood sugar
+  output$fbs <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+    
+    dt <- lab_qc()%>%
+      filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
+    
+    dt <- dt[, col_order]
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fbs'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  # Baseline Fasting total cholesterol
+  output$tchol <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","total_cholesterol_clinic",
+                   "total_cholesterol_lab")
+    
+    dt <- lab_qc()%>%
+      filter(as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_ftchol'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  # Baseline Fasting HDL cholesterol
+  output$hdlchol <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","HDL_cholesterol_clinic", "HDL_cholesterol_lab")
+    
+    dt <- lab_qc()%>%
+      filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fhdlchol'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  # Baseline Fasting Triglycerides
+  output$ftrig <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","Triglycerides_clinic",
+                   "Triglycerides_lab")
+    
+    dt <- lab_qc()%>%
+      filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab))
+    
+    dt <- dt[, col_order]
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_trigchol'));"),
+              extensions = 'Buttons')
+    
+  })
+  
   
 }

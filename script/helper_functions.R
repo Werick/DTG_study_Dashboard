@@ -978,19 +978,24 @@ createSchedule = function(df_enr, df_track, df_fu){
     df.final$next_visit_date = as.Date(as.character(df.final$next_visit_date))
     df.final$tca_fasting_labs = as.Date(as.character(df.final$tca_fasting_labs))
     df.final$source = 'enrollment'
-    df.final$nextvisit <- with (df.final, ifelse(tca_fasting_labs %in% c("2000-01-01"), as.character(next_visit_date),
-                                                 as.character(tca_fasting_labs)))
+    df.final$nextvisit <- with (df.final, ifelse(tca_fasting_labs %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
+                                                 ifelse(as.Date(as.character(next_visit_date))> as.Date(as.character(tca_fasting_labs)),as.character(next_visit_date),as.character(tca_fasting_labs))))
     
     df.fu = df_fu[,c('studyid', 'next_visit_date', 'tca_fasting_labs')]
-    df.fu$next_visit_date = as.Date(as.character(df.fu$next_visit_date))
-    df.fu$tca_fasting_labs = as.Date(as.character(df.fu$tca_fasting_labs))
-    df.fu$source = 'follow-up'
-    df.fu$nextvisit <- with (df.fu, ifelse(tca_fasting_labs %in% c("2000-01-01"), as.character(next_visit_date),
-                                           as.character(tca_fasting_labs)))
+    if (length(df_fu$studyid) != 0) {
+      df.fu$next_visit_date = as.Date(as.character(df.fu$next_visit_date))
+      df.fu$tca_fasting_labs = as.Date(as.character(df.fu$tca_fasting_labs))
+      df.fu$source = 'follow-up'
+      df.fu$nextvisit <- with (df.fu, ifelse(tca_fasting_labs %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
+                                             as.character(tca_fasting_labs)))
+    }
     
     df.track = df_track[,c('studyid', 'visitscheddate')]
-    df.track$visitscheddate = as.Date(as.character(df.track$visitscheddate))
-    df.track = df.track[df.track$visitscheddate > '2000-01-01',]
+    if (length(df_track$studyid)!=0){
+      df.track$visitscheddate = as.Date(as.character(df.track$visitscheddate))
+      df.track = df.track[df.track$visitscheddate > '2000-01-01',]
+      
+    }
     
     
     if (length(df.fu$studyid) > 0){
@@ -1055,6 +1060,52 @@ getMissedVisits = function(df_fu, df_track, df_scheduled){
   df_merge = df_merge[,c('studyid',  'nextvisit', 'source', 'vdate')]
   colnames(df_merge) = c('studyid',  'missedvisitdate', 'source','Last_seen')
   return(df_merge)
+}
+
+# -----------------------------------------------------------------------------
+# BASELINE LAB QC INFORMATION
+# -----------------------------------------------------------------------------
+baseline_lab_qc <- function(df_enr, df_lab) {
+  # select fields of interest
+  df_lab <- df_lab %>%
+    filter(studyvisit == "1") %>%
+    select(studyid1, studyvisit, daterequested, fastbsvalue, fasttotcholestval, fasthdlcholestval, fasttryglcrdsval, haemoglbna1cval)
+  
+  df_enr <- df_enr %>%
+    select(studyid,gender,pinitials, enrdate, f_glucose,f_total_chol, f_hdl_chol, f_trig, hgb )
+  
+  #Merge the table
+  df_lab_qc <- merge(df_enr,df_lab, by.x='studyid', by.y='studyid1')
+  
+  # rename the columns
+  df_lab_qc <- df_lab_qc %>% 
+    rename(fasting_bloodsugar_clinc = f_glucose,
+           fasting_bloodsugar_lab = fastbsvalue,
+           hemoglobinA1C_clinic = hgb,
+           hemoglobinA1C_lab = haemoglbna1cval,
+           total_cholesterol_clinic = f_total_chol,
+           HDL_cholesterol_clinic = f_hdl_chol,
+           Triglycerides_clinic = f_trig,
+           total_cholesterol_lab = fasttotcholestval,
+           HDL_cholesterol_lab = fasthdlcholestval,
+           Triglycerides_lab = fasttryglcrdsval)
+  
+  #Filter values that have different values
+  df_lab_qc <- df_lab_qc %>%
+    filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab) |
+             as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab) |
+             as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab) |
+             as.double(Triglycerides_clinic) != as.double(Triglycerides_lab) |
+             as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
+  
+  # order columns
+  col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab", "total_cholesterol_clinic",
+                 "total_cholesterol_lab", "HDL_cholesterol_clinic", "HDL_cholesterol_lab","Triglycerides_clinic",
+                 "Triglycerides_lab", "fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+  
+  df_lab_qc <- df_lab_qc[,col_order]
+  
+  return(df_lab_qc)
 }
 
 
