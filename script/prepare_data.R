@@ -2,6 +2,7 @@
 # Main dashboard
 
 library(RODBC) #library to get data from SQL server/MsAccess DB
+library(dplyr)
 
 df_file_path =  "C:/DTGSTudy/MSAccessDB/dtgstudy.mdb"
 df_file_path_lab =  "C:/DTGSTudy/MSAccessDB/DTG Lab database.accdb"

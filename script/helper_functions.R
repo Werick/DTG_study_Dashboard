@@ -95,7 +95,7 @@ get_diabetic_status_baseline = function(df) {
     if (as.double(df['f_glucose']) ==-9.0 & as.double(df['hgb']) == -9.0) {
       return("Unknown")
       
-    } else if (as.double(df['f_glucose']) >= 7.0 | as.double(df['hgb']) >= 6.6) {
+    } else if ((as.double(df['f_glucose']) >= 7.0 | as.double(df['hgb']) >= 6.6)) {
       return("Diabetic")
     } else {
       return("Not Diabetic")
@@ -943,18 +943,21 @@ get_bmi_status = function(df,df_f) {
   }
 }
 
-create_retention_data = function(df_enr, df_fu) {
+create_retention_data = function(df_enr, df_fu, df_w) {
   df_final <- df_enr
   df_final$last_seen = apply(df_final, 1, get_date_last_seen, df_f = df_fu)
   df_final$hyp_status_1 = apply(df_final, 1, get_hyptension_status, df_f = df_fu)
   df_final$diab_status_1 = apply(df_final, 1, get_diabetic_status, df_f = df_fu)
   df_final$chol_status_1 = apply(df_final, 1, get_cholesterol_status, df_f = df_fu)
   df_final$bmi_status_1 = apply(df_final, 1, get_bmi_status, df_f = df_fu)
-  
+  #print(paste('withdrwn',length(df_w$studyid)))
+  df_w <- df_w %>%
+    filter(withdrawstatus %in% c(-9, 0))
+  #print(paste('withdrwn',length(df_w$studyid)))
   six_months_ago = Sys.Date() - 180
   
-  df_final$retention_status = with(df_final, 
-                         ifelse(as.Date(as.character(last_seen)) < six_months_ago, 'Not Retained (no visit 6 mo)', 'Retained'))
+  df_final$retention_status = with(df_final, ifelse(studyid %in% df_w$studyid, "Not Retained (Withdrawn)",
+                         ifelse(as.Date(as.character(last_seen)) < six_months_ago, 'Not Retained (no visit 6 mo)', 'Retained')))
   
   df_final <- df_final %>%
     select(studyid, gender, last_seen, retention_status, hyp_status_1, bmi_status_1, diab_status_1, bmi_status_1)
@@ -1068,7 +1071,7 @@ getMissedVisits = function(df_fu, df_track, df_scheduled){
 baseline_lab_qc <- function(df_enr, df_lab) {
   # select fields of interest
   df_lab <- df_lab %>%
-    filter(studyvisit == "1") %>%
+    filter(as.numeric(studyvisit) == 0) %>%
     select(studyid1, studyvisit, daterequested, fastbsvalue, fasttotcholestval, fasthdlcholestval, fasttryglcrdsval, haemoglbna1cval)
   
   df_enr <- df_enr %>%
@@ -1108,4 +1111,52 @@ baseline_lab_qc <- function(df_enr, df_lab) {
   return(df_lab_qc)
 }
 
+
+
+# -----------------------------------------------------------------------------
+# Follow-up LAB QC INFORMATION
+# -----------------------------------------------------------------------------
+followup_lab_qc <- function(df_fu, df_lab, fu_month) {
+  # select fields of interest
+  df_lab <- df_lab %>%
+    filter(as.numeric(studyvisit) == fu_month) %>%
+    select(studyid1, studyvisit, daterequested, fastbsvalue, fasttotcholestval, fasthdlcholestval, fasttryglcrdsval, haemoglbna1cval)
+  
+  df_fu <- df_fu %>%
+    select(studyid, gender, fuvnumber, vdate, f_glucose,f_total_chol, f_hdl_chol, f_trig, hgb ) %>%
+    filter(as.numeric(fuvnumber)== fu_month)
+  
+  #Merge the table
+  df_lab_qc <- merge(df_fu, df_lab, by.x='studyid', by.y='studyid1')
+  
+  # rename the columns
+  df_lab_qc <- df_lab_qc %>% 
+    rename(fasting_bloodsugar_clinc = f_glucose,
+           fasting_bloodsugar_lab = fastbsvalue,
+           hemoglobinA1C_clinic = hgb,
+           hemoglobinA1C_lab = haemoglbna1cval,
+           total_cholesterol_clinic = f_total_chol,
+           HDL_cholesterol_clinic = f_hdl_chol,
+           Triglycerides_clinic = f_trig,
+           total_cholesterol_lab = fasttotcholestval,
+           HDL_cholesterol_lab = fasthdlcholestval,
+           Triglycerides_lab = fasttryglcrdsval)
+  
+  #Filter values that have different values
+  df_lab_qc <- df_lab_qc %>%
+    filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab) |
+             as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab) |
+             as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab) |
+             as.double(Triglycerides_clinic) != as.double(Triglycerides_lab) |
+             as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
+  
+  # order columns
+  col_order <- c("studyid","gender", "vdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab", "total_cholesterol_clinic",
+                 "total_cholesterol_lab", "HDL_cholesterol_clinic", "HDL_cholesterol_lab","Triglycerides_clinic",
+                 "Triglycerides_lab", "fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+  
+  df_lab_qc <- df_lab_qc[,col_order]
+  
+  return(df_lab_qc)
+}
 

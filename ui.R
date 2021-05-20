@@ -22,7 +22,10 @@ ui <- dashboardPage(
                menuSubItem("Follow-up", tabName = "follow_up")
                ),
       menuItem("Data QC", tabName = "data_qc",icon = icon("database"),
-               menuSubItem("QC Reports", tabName = "qc_report")),
+               menuSubItem("QC Reports Baseline", tabName = "qc_report"),
+               menuSubItem("QC Reports Followup 1", tabName = "qc_report1"),
+               menuSubItem("QC Reports Followup 3", tabName = "qc_report3"),
+               menuSubItem("QC Reports Followup 6", tabName = "qc_report6")),
       menuItem("Reports", tabName = "reports", icon = icon("th"),
                menuSubItem("Scheduled/Missed Visits", tabName = "missed_visit"),
                menuSubItem("Withdrawals/Move", tabName = "withdrawal"),
@@ -211,6 +214,41 @@ ui <- dashboardPage(
                    div(style = 'overflow-x: scroll', DT::dataTableOutput('ftrig')),
                     downloadButton("download_trigchol", label = "Fasting Triglycerides csv")
                 )
+              )
+              ),
+      tabItem(tabName = 'qc_report1',
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in hemoglobin A1C",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hemoglobin1')),
+                    downloadButton("download_hgb1", label = "hemoglobinA1C csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Blood Sugar",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('fbs1')),
+                    downloadButton("download_fbs1", label = "fasting blood sugar csv")
+                )
+              ),
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting total cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('tchol1')),
+                    downloadButton("download_ftchol1", label = "Fasting total cholesterol csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting HDL cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hdlchol1')),
+                    downloadButton("download_fhdlchol1", label = "Fasting HDL cholesterol csv")
+                )
+              ),
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Triglycerides ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('ftrig1')),
+                    downloadButton("download_trigchol1", label = "Fasting Triglycerides csv")
+                )
+              )
+      ),
+      tabItem(tabName = 'withdrawal',
+              fluidRow(
+                h2("Withdrawn Participants"),
+                div(style = 'overflow-x: scroll', DT::dataTableOutput('withraw_list')),
+                downloadButton("download_withdrawn","Download csv")
               )
               )
       

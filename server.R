@@ -75,7 +75,7 @@ df_followup$hyp_status_1 <- apply(df_followup, 1, get_hyptension_status_baseline
 df_followup$chol_status_1 <- apply(df_followup, 1, get_cholesterol_status_baseline)
 df_followup$diab_status_1 <- apply(df_followup, 1, get_diabetic_status_baseline)
 
-df_retention <- create_retention_data(df_enr, df_followup)
+df_retention <- create_retention_data(df_enr, df_followup, df_withdraw)
 
 # guidance og google authentication is availabe here https://lmyint.github.io/post/shiny-app-with-google-login/
 # and https://gist.github.com/explodecomputer/ef4341872582719d6b73
@@ -158,51 +158,51 @@ server <- function(input, output, session) {
      )
    }
 
-  # obs1 <- observe({
-  #   showModal(dataModal())
-  # })
-  
+   obs1 <- observe({
+     showModal(dataModal())
+   })
+
   ## Authentication
-  # accessToken <- callModule(googleAuth, "gauth_login",
-  #                           login_class = "btn btn-primary",
-  #                           logout_class = "btn btn-primary")
+   accessToken <- callModule(googleAuth, "gauth_login",
+                             login_class = "btn btn-primary",
+                             logout_class = "btn btn-primary")
+
+   userDetails <- reactive({
+     validate(
+       need(accessToken(), "not logged in")
+     )
+     with_shiny(get_user_info, shiny_access_token = accessToken())
+   })
   
-  # userDetails <- reactive({
-  #   validate(
-  #     need(accessToken(), "not logged in")
-  #   )
-  #   with_shiny(get_user_info, shiny_access_token = accessToken())
-  # })
-  # 
-  # obs2 <- observe({
-  #   
-  #   validate(
-  #     need(userDetails(), "getting user details"))
-  #   
-  #   if(userDetails()$email %in% df_users$email){
-  #     # close the log in dialog if authenticated
-  #     obs1$suspend()
-  #     
+   obs2 <- observe({
+
+     validate(
+       need(userDetails(), "getting user details"))
+
+     if(userDetails()$email %in% df_users$email){
+       # close the log in dialog if authenticated
+       obs1$suspend()
+
   #     # hacky way to deal with modal sizes
-  #     showModal(dataModal(TRUE))
-  #     removeModal()
-  #   }
-  #   else{
-  #     showModal(dataModal2())
-  #   }
-  # })
-  # 
+       showModal(dataModal(TRUE))
+       removeModal()
+     }
+     else{
+       showModal(dataModal2())
+     }
+   })
+
   
-  # user_name = reactive({
-  #   userDetails()$name
-  # })
+   user_name = reactive({
+     userDetails()$name
+   })
   
   ## Display user's Google display name after successful login
   
-  # output$logininfo <- renderUI({
-  #   x <- user_name()
-  #   HTML('<p>Logged in as <strong>', x,  '</p>')
-  # })
+   output$logininfo <- renderUI({
+     x <- user_name()
+     HTML('<p>Logged in as <strong>', x,  '</p>')
+   })
   
   # -------------------------------------------
   # VALUE BOXES ON THE MAIN/ENROLLMENT TAB
@@ -1078,7 +1078,7 @@ server <- function(input, output, session) {
       filter(!duplicated(studyid))
     
     df_retained <- dt %>%
-      filter(gender == 'Male')
+      filter(gender == 'Male' &  !grepl('Not', retention_status))
     
     proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
     
@@ -1093,7 +1093,7 @@ server <- function(input, output, session) {
       filter(!duplicated(studyid))
     
     df_retained <- dt %>%
-      filter(hyp_status_1 == 'Hypertensive')
+      filter(hyp_status_1 == 'Hypertensive' &  !grepl('Not', retention_status))
     
     proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
     
@@ -1223,6 +1223,12 @@ server <- function(input, output, session) {
     ret_val <- baseline_lab_qc(df_enr, df_lab)
   })
   
+  lab_qc_fu1 <- reactive({
+    ret_val <- followup_lab_qc(follow_up_data(), df_lab, 1)
+  })
+  
+  
+  
   # Baseline hemoglobin 1AC
   output$hemoglobin <- DT::renderDataTable({
     col_order <- c("studyid","gender", "pinitials", "enrdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab")
@@ -1231,12 +1237,25 @@ server <- function(input, output, session) {
       filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab))
     
     dt <- dt[, col_order]
+    df_download$df_data_hgb = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_hgb'));"),
               extensions = 'Buttons')
     
   })
+  
+  #Download button handler
+  output$download_hgb <- downloadHandler(
+    
+    filename = function() {
+      paste("hgb_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_hgb, file)
+    }
+  )
+  
   
   # Baseline Fasting blood sugar
   output$fbs <- DT::renderDataTable({
@@ -1246,12 +1265,24 @@ server <- function(input, output, session) {
       filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
     
     dt <- dt[, col_order]
+    df_download$df_data_fbs = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_fbs'));"),
               extensions = 'Buttons')
     
   })
+  
+  #Download button handler
+  output$download_fbs <- downloadHandler(
+    
+    filename = function() {
+      paste("fbs_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_fbs, file)
+    }
+  )
   
   # Baseline Fasting total cholesterol
   output$tchol <- DT::renderDataTable({
@@ -1262,12 +1293,25 @@ server <- function(input, output, session) {
       filter(as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab))
     
     dt <- dt[, col_order]
+    df_download$df_data_ftchol = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_ftchol'));"),
               extensions = 'Buttons')
     
   })
+  
+  #Download button handler
+  output$download_ftchol <- downloadHandler(
+    
+    filename = function() {
+      paste("ftchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_ftchol, file)
+    }
+  )
+  
   
   # Baseline Fasting HDL cholesterol
   output$hdlchol <- DT::renderDataTable({
@@ -1277,12 +1321,24 @@ server <- function(input, output, session) {
       filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab))
     
     dt <- dt[, col_order]
+    df_download$df_data = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_fhdlchol'));"),
               extensions = 'Buttons')
     
   })
+  
+  #Download button handler
+  output$download_fhdlchol <- downloadHandler(
+    
+    filename = function() {
+      paste("fhdlchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
   
   # Baseline Fasting Triglycerides
   output$ftrig <- DT::renderDataTable({
@@ -1293,6 +1349,7 @@ server <- function(input, output, session) {
       filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab))
     
     dt <- dt[, col_order]
+    df_download$df_data = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_trigchol'));"),
@@ -1300,5 +1357,175 @@ server <- function(input, output, session) {
     
   })
   
+  #Download button handler
+  output$download_trigchol <- downloadHandler(
+    
+    filename = function() {
+      paste("trigchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
   
+  #----------------------------------------------------------------------------
+  # FOLLOW -UP QC Month 1
+  #----------------------------------------------------------------------------
+  # Add reactibe object to handle data dynamic data downloads
+  df_download <- reactiveValues(df_data = NULL)
+  
+  # Follow-up m1 hemoglobin 1AC
+  output$hemoglobin1 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab")
+    
+    dt <- lab_qc_fu1()%>%
+      filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data = dt
+    
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_hgb1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  #Download button handler
+  output$download_hgb1 <- downloadHandler(
+    
+    filename = function() {
+      paste("fsb_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
+  
+  # Followup m1 Fasting blood sugar
+  output$fbs1 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+    
+    dt <- lab_qc_fu1()%>%
+      filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fbs1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  #Doownload button handler
+  output$download_fbs1 <- downloadHandler(
+    
+    filename = function() {
+      paste("fsb_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
+  
+  # Follow-up m1 Fasting total cholesterol
+  output$tchol1 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","total_cholesterol_clinic",
+                   "total_cholesterol_lab")
+    
+    dt <- lab_qc_fu1()%>%
+      filter(as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_ftchol1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_ftchol1 <- downloadHandler(
+   
+    filename = function() {
+      paste("ftchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
+  
+  # Follow-up m1 Fasting HDL cholesterol
+  output$hdlchol1 <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "vdate","daterequested","HDL_cholesterol_clinic", "HDL_cholesterol_lab")
+    
+    dt <- lab_qc_fu1()%>%
+      filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fhdlchol1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_fhdlchol1 <- downloadHandler(
+    
+    filename = function() {
+      paste("fhdlchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
+  
+  # Follow-up m1 Fasting Triglycerides
+  output$ftrig1 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","Triglycerides_clinic",
+                   "Triglycerides_lab")
+    
+    dt <- lab_qc_fu1()%>%
+      filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data = dt # add this to reactive df
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_trigchol1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_trigchol1 <- downloadHandler(
+    
+    filename = function() {
+      paste("trigchol_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data, file)
+    }
+  )
+  
+  output$withraw_list <- DT::renderDataTable({
+    
+    df_withdraw$withdrawmove <- ifelse(df_withdraw$withdrawmove == 1, "Withdrawn", "Moved")
+    df_withdraw$withdrawreason <- ifelse(df_withdraw$withdrawreason == 1, "Ineligible", 
+                                         ifelse(df_withdraw$withdrawreason == 2, "Withdrawal of Consent",
+                                                ifelse(df_withdraw$withdrawreason == 3, "Death", 
+                                                       ifelse(df_withdraw$withdrawreason == 4, df_withdraw$withdrawreasonoth, "N/A"))))
+    df_withdraw$location <- ifelse(df_withdraw$location %in% c("-9","-7"),"N/A",df_withdraw$location)
+    df_withdraw$village <- ifelse(df_withdraw$village %in% c("-9","-7"),"N/A",df_withdraw$village)
+    df_withdraw$facility <- ifelse(df_withdraw$facility %in% c("-9","-7"),"N/A",df_withdraw$facility)
+    df_withdraw$comments <- ifelse(df_withdraw$comments %in% c("-9","-7"),"N/A",df_withdraw$comments)
+      
+    dt <- df_withdraw %>%
+      select(studyid, tdate, pinitials,withdrawmove,withdrawreason,wdate, location,village,facility,comments)
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_withdrawn'));"),
+              extensions = 'Buttons')
+  })
 }
