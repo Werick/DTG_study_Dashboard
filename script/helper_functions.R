@@ -247,7 +247,7 @@ get_followup_details <- function(df, study_id, selected_date) {
   bp_diastolic_2 <- ifelse(df_selected_enr$bp_diastolic_2 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_2))
   bp_systolic_3 <- ifelse(df_selected_enr$bp_systolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_systolic_3))
   bp_diastolic_3 <- ifelse(df_selected_enr$bp_diastolic_3 %in% c(-6,-9), "N/A", as.character(df_selected_enr$bp_diastolic_3))
-  tca_fasting_labs <- ifelse(df_selected_enr$tca_fasting_labs== "01/01/2000", as.character(df_selected_enr$next_visit_date), as.character(df_selected_enr$tca_fasting_labs))
+  tca_fasting_labs <- ifelse(df_selected_enr$tca_fasting_labs %in% c("01/01/2000", "2000-01-01"), as.character(df_selected_enr$next_visit_date), as.character(df_selected_enr$tca_fasting_labs))
   
   return_string1 <- sprintf("
     <u><b>Vitals</b> </u> <br>
@@ -691,6 +691,10 @@ create_timeline_df <- function(df_sc, df_en, df_fu, df_wd, df_tr, study_id) {
   df_fu_filtered = df_fu %>%
     filter(toupper(studyid) == toupper(study_id))
   
+  #endpoint - Month 6
+  df_endpoint_temp = df_fu_filtered %>%
+    filter(as.numeric(fuvnumber)== 6)
+  
   # Withdrawal
   df_wd_filtered = df_wd %>%
     filter(toupper(studyid) == toupper(study_id))
@@ -747,6 +751,19 @@ create_timeline_df <- function(df_sc, df_en, df_fu, df_wd, df_tr, study_id) {
     
   }
   
+  # add enpoint ascertainment
+  
+  if (nrow(df_endpoint_temp) > 0){
+    
+    df_endpoint_temp$content <- '<font color="blue"><i>Endpoint Ascertainment</i></font>'
+    df_endpoint_temp$end_date <- NA
+    
+    content_vec = c(content_vec, df_endpoint_temp$content)
+    start_vec = c(start_vec, as.character(as.Date(df_endpoint_temp$vdate_0)))
+    end_vec = c(end_vec, df_endpoint_temp$end_date)
+   
+  }
+  
   # Add Tracking details to the timeline vector
   if (length(df_tr_filtered$studyid) != 0) {
     
@@ -780,7 +797,8 @@ create_visit_list <- function(df_timeline) {
                                       ifelse(grepl("Tracking", content),"Tracking",
                                              ifelse(grepl("Withdrawal", content),"Withdrawal",
                                                     ifelse(grepl("Followup-visit", content),"Followup",
-                                                           ifelse(grepl("Moved", content),"Moved","NA")))))))
+                                                           ifelse(grepl("Moved", content),"Moved",
+                                                                  ifelse(grepl("Endpoint", content), "Endpoint", "NA"))))))))
   
   df_temp$visit_name = paste(df_temp$visit_name, as.character(as.Date(df_temp$start)), sep = ' - ')
   df_temp = arrange(df_temp, desc(start), desc(id))
@@ -837,7 +855,7 @@ get_date_last_seen = function(df,df_f) {
 get_hyptension_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (bp_systolic_1 != -9| bp_diastolic_1 != -9)) %>%
+    filter(studyid == df['studyid'], (!bp_systolic_1 %in% c(-9, -6)| !bp_diastolic_1 %in% c(-9, -6))) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   # use normal values if any
@@ -877,7 +895,8 @@ get_hyptension_status = function(df,df_f) {
 get_diabetic_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (as.double(f_glucose) != -9.0 | as.double(hgb) != -9.0)) %>%
+    filter(studyid == df['studyid'], (!as.double(f_glucose)  %in% c(-9.0, -6.00) | 
+                                        !as.double(hgb) %in% c(-9.0, -6.00))) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
@@ -897,11 +916,13 @@ get_diabetic_status = function(df,df_f) {
 get_cholesterol_status = function(df,df_f) {
   
   df_visits <- df_f %>%
-    filter(studyid == df['studyid'], (as.double(f_trig)  != -9.0 | as.double(f_hdl_chol) != -9.0 | as.double(f_hdl_chol) != -9.0)) %>%
+    filter(studyid == df['studyid'] & (!as.double(f_trig)  %in% c(-9.0, -6.00) | 
+                                        !as.double(f_hdl_chol) %in% c(-9.0, -6.00) | 
+                                        !as.double(f_hdl_chol) %in% c(-9.0, -6.00))) %>%
     arrange(desc(as.Date(as.character(vdate))))
   
   if (nrow(df_visits)>0) {
-    if (as.double(df_visits[1,'f_hdl_chol']) !=-9.0) {
+    if (as.double(!df_visits[1,'f_hdl_chol']) %in% c(-9.0, -6.00)) {
       if (as.double(df_visits[1,'f_trig']) >= 1.7 | (as.double(df_visits[1,'f_hdl_chol']) < 0.9 & df_visits[1,'gender']=="Male") | (as.double(df_visits[1,'f_hdl_chol']) < 1.0 & df_visits[1,'gender']=="Female")) {
         return("High Cholesterol")
       } else {
@@ -954,7 +975,7 @@ create_retention_data = function(df_enr, df_fu, df_w) {
   df_w <- df_w %>%
     filter(withdrawstatus %in% c(-9, 0))
   #print(paste('withdrwn',length(df_w$studyid)))
-  six_months_ago = Sys.Date() - 180
+  six_months_ago = Sys.Date() - 90
   
   df_final$retention_status = with(df_final, ifelse(studyid %in% df_w$studyid, "Not Retained (Withdrawn)",
                          ifelse(as.Date(as.character(last_seen)) < six_months_ago, 'Not Retained (no visit 6 mo)', 'Retained')))
@@ -981,7 +1002,7 @@ createSchedule = function(df_enr, df_track, df_fu){
     df.final$next_visit_date = as.Date(as.character(df.final$next_visit_date))
     df.final$tca_fasting_labs = as.Date(as.character(df.final$tca_fasting_labs))
     df.final$source = 'enrollment'
-    df.final$nextvisit <- with (df.final, ifelse(tca_fasting_labs %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
+    df.final$nextvisit <- with (df.final, ifelse(as.character(tca_fasting_labs) %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
                                                  ifelse(as.Date(as.character(next_visit_date))> as.Date(as.character(tca_fasting_labs)),as.character(next_visit_date),as.character(tca_fasting_labs))))
     
     df.fu = df_fu[,c('studyid', 'next_visit_date', 'tca_fasting_labs')]
@@ -989,7 +1010,7 @@ createSchedule = function(df_enr, df_track, df_fu){
       df.fu$next_visit_date = as.Date(as.character(df.fu$next_visit_date))
       df.fu$tca_fasting_labs = as.Date(as.character(df.fu$tca_fasting_labs))
       df.fu$source = 'follow-up'
-      df.fu$nextvisit <- with (df.fu, ifelse(tca_fasting_labs %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
+      df.fu$nextvisit <- with (df.fu, ifelse(as.character(tca_fasting_labs) %in% c("2000-01-01", "01/01/2000"), as.character(next_visit_date),
                                              as.character(tca_fasting_labs)))
     }
     
@@ -1023,14 +1044,17 @@ createSchedule = function(df_enr, df_track, df_fu){
 # GENERATE RAW MISSED VISITS TABLE
 # -------------------------------------------
 
-getMissedVisits = function(df_fu, df_track, df_scheduled){
+getMissedVisits = function(df_fu, df_track, df_scheduled, df_enr){
   
   df_track_temp = df_track[,c('studyid', 'tdate')]
   colnames(df_track_temp) = c('studyid', 'vdate')
   
+  df_enr_temp = df_enr[,c('studyid', 'enrdate')]
+  colnames(df_enr_temp) = c('studyid', 'vdate')
+  
   
   df_visits = rbind(df_fu[,c('studyid', 'vdate')],
-                    df_track_temp)
+                    df_track_temp, df_enr_temp)
   
   df_visits$vdate = as.Date(as.character(df_visits$vdate))
   
@@ -1056,8 +1080,8 @@ getMissedVisits = function(df_fu, df_track, df_scheduled){
   #drop any duplicate appointments
   df_past_scheduled = df_past_scheduled[!duplicated(df_past_scheduled$studyid),]
   
-  df_merge = merge(df_past_scheduled, df_visits, by = 'studyid')
-  df_merge = df_merge[as.Date(as.character(df_merge$nextvisit)) > as.Date(as.character(df_merge$vdate)) + 7,]
+  df_merge = merge(df_past_scheduled, df_visits, by = 'studyid', all.x = T)
+  df_merge = df_merge[is.na(df_merge$vdate) | as.Date(as.character(df_merge$nextvisit)) > as.Date(as.character(df_merge$vdate)) + 7,]
   df_merge$nextvisit = as.Date(as.character(df_merge$nextvisit))
   
   df_merge = df_merge[,c('studyid',  'nextvisit', 'source', 'vdate')]
@@ -1122,12 +1146,15 @@ followup_lab_qc <- function(df_fu, df_lab, fu_month) {
     filter(as.numeric(studyvisit) == fu_month) %>%
     select(studyid1, studyvisit, daterequested, fastbsvalue, fasttotcholestval, fasthdlcholestval, fasttryglcrdsval, haemoglbna1cval)
   
+  
   df_fu <- df_fu %>%
     select(studyid, gender, fuvnumber, vdate, f_glucose,f_total_chol, f_hdl_chol, f_trig, hgb ) %>%
     filter(as.numeric(fuvnumber)== fu_month)
   
   #Merge the table
-  df_lab_qc <- merge(df_fu, df_lab, by.x='studyid', by.y='studyid1')
+  df_lab_qc <- merge(df_fu, df_lab, by.x='studyid', by.y='studyid1', all.x = T)
+  
+  #print(paste("Total endpoint merged", nrow(df_lab_qc)))
   
   # rename the columns
   df_lab_qc <- df_lab_qc %>% 
@@ -1145,9 +1172,13 @@ followup_lab_qc <- function(df_fu, df_lab, fu_month) {
   #Filter values that have different values
   df_lab_qc <- df_lab_qc %>%
     filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab) |
+             as.double(hemoglobinA1C_clinic) == -6.00 |
              as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab) |
+             as.double(total_cholesterol_clinic) == -6.00 | is.na(total_cholesterol_lab) |
              as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab) |
+             as.double(HDL_cholesterol_clinic) == -6.00 | is.na(HDL_cholesterol_lab) |
              as.double(Triglycerides_clinic) != as.double(Triglycerides_lab) |
+             as.double(Triglycerides_clinic) == -6.00 | is.na(Triglycerides_lab) |
              as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
   
   # order columns
@@ -1156,6 +1187,8 @@ followup_lab_qc <- function(df_fu, df_lab, fu_month) {
                  "Triglycerides_lab", "fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
   
   df_lab_qc <- df_lab_qc[,col_order]
+  
+  #print(paste("Total endpoint fu", nrow(df_lab_qc)))
   
   return(df_lab_qc)
 }
