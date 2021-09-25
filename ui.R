@@ -21,6 +21,9 @@ ui <- dashboardPage(
                menuSubItem("Enrollment", tabName = "enrollment"),
                menuSubItem("Follow-up", tabName = "follow_up")
                ),
+      menuItem("Endpoint", tabName = "endpoint", icon = icon("hourglass-end"),
+               menuSubItem("Status Overview", tabName = "ep_overview"),
+               menuSubItem("Preliminary Results", tabName = "ep_results")),
       menuItem("Data QC", tabName = "data_qc",icon = icon("database"),
                menuSubItem("QC Reports Baseline", tabName = "qc_report"),
                menuSubItem("QC Reports Followup 1", tabName = "qc_report1"),
@@ -244,13 +247,90 @@ ui <- dashboardPage(
                 )
               )
       ),
+      tabItem(tabName = 'qc_report3',
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Blood Sugar",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('fbs3')),
+                    downloadButton("download_fbs3", label = "fasting blood sugar csv")
+                )
+              )
+      ),
+      tabItem(tabName = 'qc_report6',
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in hemoglobin A1C",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hemoglobin6')),
+                    downloadButton("download_hgb6", label = "hemoglobinA1C csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Blood Sugar",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('fbs6')),
+                    downloadButton("download_fbs6", label = "fasting blood sugar csv")
+                )
+              ),
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting total cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('tchol6')),
+                    downloadButton("download_ftchol6", label = "Fasting total cholesterol csv")
+                ),
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting HDL cholesterol ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('hdlchol6')),
+                    downloadButton("download_fhdlchol6", label = "Fasting HDL cholesterol csv")
+                )
+              ),
+              fluidRow(
+                box(status = "primary", solidHeader = TRUE, title = "Error in Fasting Triglycerides ",
+                    div(style = 'overflow-x: scroll', DT::dataTableOutput('ftrig6')),
+                    downloadButton("download_trigchol6", label = "Fasting Triglycerides csv")
+                )
+              )
+      ),
       tabItem(tabName = 'withdrawal',
               fluidRow(
                 h2("Withdrawn Participants"),
                 div(style = 'overflow-x: scroll', DT::dataTableOutput('withraw_list')),
                 downloadButton("download_withdrawn","Download csv")
               )
+              ),
+      tabItem(tabName = 'ep_overview',
+              fluidRow(
+                box(status = 'primary', solidHeader = TRUE, title = "DTG Month 6 Endpoint Overview",
+                    htmlOutput("in_window"),
+                    radioGroupButtons(
+                      inputId = "in_window_type",
+                      choices = c("Completed" = "endpoint_complete",
+                                  "started" = "endpoint_started")
+                    ),
+                    htmlOutput('in_window_progress')),
+                box(status = "primary", solidHeader = TRUE, title = "Summary Statistics at Month 6 (Started or Completed)",
+                    htmlOutput("in_window_weight_change"),
+                    htmlOutput("in_window_diabetic"),
+                    htmlOutput("in_window_hypertensive"),
+                    htmlOutput("in_window_high_chol")
+                    )
+              ),
+              fluidRow(box(
+                HTML("This line list only includes those who are in their endpoint window.<br><br>"),
+                checkboxGroupInput(inputId="ep_vars_to_include", label="Variables to include", 
+                                   choices=c("Endpoint Ascertained", "Endpoint Started", "Withdrawn"),
+                                              selected = c("Endpoint Ascertained"), inline = TRUE),
+                div(style = 'overflow-x: scroll', DT::dataTableOutput("ep_ind_line_list")),
+                downloadButton('download_ep_line_list', 'Download CSV'),
+                tags$script("$(document).on('click', '#ep_ind_line_list button', function () {
+                  Shiny.onInputChange('lastClickId',this.id);
+                              Shiny.onInputChange('lastClick', Math.random())
+                              });"),
+                title = 'Individual Line List', width = 12))
+      ),
+      tabItem('ep_results', 
+              fluidRow(
+                box(
+                  status = 'primary', 
+                  title = 'Summary Spreadsheet', 
+                  div(style = 'overflow-x: scroll', tableOutput('ep_summary_table')),
+                  downloadButton('download_ep_summary_ss', 'Download CSV'),
+                  width = 12
+                )
               )
+      )
       
     )
   )
