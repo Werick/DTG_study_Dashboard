@@ -635,15 +635,28 @@ server <- function(input, output, session) {
       } 
     }
     
+    #Monthly enrollments by gender
+    data_summary <- df_enr %>%
+      group_by(gender, year_month = floor_date(as.Date(as.character(enrdate)), unit = "month")) %>%
+      summarize(count = n())
     
-    
-    
-    p <- ggplot(df, aes(x=vmonth,fill=gender)) +
-      geom_bar(stat = "count") +
-      xlab("Visit Month") +
+    p <- ggplot(data_summary, aes(x = year_month, y = count, fill = gender)) +
+      geom_col() +
+      scale_x_date(
+        labels = date_format("%Y-%m"),
+        breaks = "month") +
+      xlab("Enrollment Month") +
       ylab("Number Enrolled") +
       ggtitle("Monthly enrollment summary") +
       theme_minimal()
+    
+    # p <- ggplot(df, aes(x=vmonth,fill=gender)) +
+    #   geom_bar(stat = "count") +
+    #   xlab("Visit Month") +
+    #   ylab("Number Enrolled") +
+    #   ggtitle("Monthly enrollment summary") +
+    #   theme_minimal()
+    
     ggplotly(p) %>% config(displayModeBar = FALSE)
   })
   # Add downloadable list
@@ -1080,10 +1093,10 @@ server <- function(input, output, session) {
     df_retained <- dt %>%
       filter(gender == 'Male' &  !grepl('Not', retention_status))
     
-    proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
+    proption <- round(100 * length(df_retained$studyid)/ length(dt[dt$gender=='Male',]$studyid),1)
     
     valueBox(
-      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Male Proportion Retained",
+      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt[dt$gender=='Male',]$studyid),")"), "Male Proportion Retained",
       color = "aqua"
     )
   })
@@ -1095,10 +1108,10 @@ server <- function(input, output, session) {
     df_retained <- dt %>%
       filter(hyp_status_1 == 'Hypertensive' &  !grepl('Not', retention_status))
     
-    proption <- round(100 * length(df_retained$studyid)/ length(dt$studyid),1)
+    proption <- round(100 * length(df_retained$studyid)/ length(dt[dt$hyp_status_1 == 'Hypertensive',]$studyid),1)
     
     valueBox(
-      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt$studyid),")"), "Hypertensive Proportion Retained",
+      paste0(proption,"%(",length(df_retained$studyid),"/",length(dt[dt$hyp_status_1 == 'Hypertensive',]$studyid),")"), "Hypertensive Proportion Retained",
       color = "aqua"
     )
   })
@@ -1205,7 +1218,7 @@ server <- function(input, output, session) {
   output$m_visits <- DT::renderDataTable({
     df_scheduled <- df_scheduled()
     
-    dt <- getMissedVisits(df_followup, df_trk, df_scheduled)
+    dt <- getMissedVisits(df_followup, df_trk, df_scheduled, df_enr)
     dt <- dt %>%
       filter(between(as.Date(as.character(missedvisitdate)), as.Date(as.character(input$mvisit_since)),
                      as.Date(as.character(input$mvisit_to))))
@@ -1225,6 +1238,14 @@ server <- function(input, output, session) {
   
   lab_qc_fu1 <- reactive({
     ret_val <- followup_lab_qc(follow_up_data(), df_lab, 1)
+  })
+  
+  lab_qc_fu3 <- reactive({
+    ret_val <- followup_lab_qc(follow_up_data(), df_lab, 3)
+  })
+  
+  lab_qc_fu6 <- reactive({
+    ret_val <- followup_lab_qc(follow_up_data(), df_lab, 6)
   })
   
   
@@ -1321,7 +1342,7 @@ server <- function(input, output, session) {
       filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_hdlchol = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_fhdlchol'));"),
@@ -1336,7 +1357,7 @@ server <- function(input, output, session) {
       paste("fhdlchol_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_hdlchol, file)
     }
   )
   
@@ -1349,7 +1370,7 @@ server <- function(input, output, session) {
       filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_ftrig = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_trigchol'));"),
@@ -1364,7 +1385,7 @@ server <- function(input, output, session) {
       paste("trigchol_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_ftrig, file)
     }
   )
   
@@ -1382,7 +1403,7 @@ server <- function(input, output, session) {
       filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_hemoglobin1 = dt
     
     #add functionality to the download button
     datatable(dt,
@@ -1398,7 +1419,7 @@ server <- function(input, output, session) {
       paste("fsb_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_hemoglobin1, file)
     }
   )
   
@@ -1410,7 +1431,7 @@ server <- function(input, output, session) {
       filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_fbs1 = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_fbs1'));"),
@@ -1425,7 +1446,7 @@ server <- function(input, output, session) {
       paste("fsb_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_fbs1, file)
     }
   )
   
@@ -1438,7 +1459,7 @@ server <- function(input, output, session) {
       filter(as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_ftchol1 = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_ftchol1'));"),
@@ -1452,7 +1473,7 @@ server <- function(input, output, session) {
       paste("ftchol_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_ftchol1, file)
     }
   )
   
@@ -1464,7 +1485,7 @@ server <- function(input, output, session) {
       filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt
+    df_download$df_data_fhdlchol1 = dt
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_fhdlchol1'));"),
@@ -1478,7 +1499,7 @@ server <- function(input, output, session) {
       paste("fhdlchol_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_fhdlchol1, file)
     }
   )
   
@@ -1491,7 +1512,7 @@ server <- function(input, output, session) {
       filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab))
     
     dt <- dt[, col_order]
-    df_download$df_data = dt # add this to reactive df
+    df_download$df_data_ftrig1 = dt # add this to reactive df
     #add functionality to the download button
     datatable(dt,
               callback = JS("$('div.dwnld').append($('#download_trigchol1'));"),
@@ -1505,7 +1526,37 @@ server <- function(input, output, session) {
       paste("trigchol_data_", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(df_download$df_data, file)
+      write.csv(df_download$df_data_ftrig1, file)
+    }
+  )
+  
+  #-----------------------------------------------------------------------------
+  # Month Fasting blood sugar QC
+  #-----------------------------------------------------------------------------
+  # Followup m3 Fasting blood sugar
+  output$fbs3 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+    
+    dt <- lab_qc_fu3()%>%
+      filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_fbs3 = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fbs1'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  #Doownload button handler
+  output$download_fbs3 <- downloadHandler(
+    
+    filename = function() {
+      paste("fsb3_data_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_fbs3, file)
     }
   )
   
@@ -1528,4 +1579,522 @@ server <- function(input, output, session) {
               callback = JS("$('div.dwnld').append($('#download_withdrawn'));"),
               extensions = 'Buttons')
   })
+  
+  #----------------------------------------------------------------------------
+  # FOLLOW -UP QC Month 6
+  #----------------------------------------------------------------------------
+  
+  
+  # Follow-up m6 hemoglobin 1AC
+  output$hemoglobin6 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","hemoglobinA1C_clinic", "hemoglobinA1C_lab")
+    
+    dt <- lab_qc_fu6()%>%
+      filter(as.double(hemoglobinA1C_clinic) != as.double(hemoglobinA1C_lab) |
+               is.na(hemoglobinA1C_clinic) | is.na(hemoglobinA1C_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_hemoglobin6 = dt
+    
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_hgb6'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  #Download button handler
+  output$download_hgb6 <- downloadHandler(
+    
+    filename = function() {
+      paste("fsb_data_m6_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_hemoglobin6, file)
+    }
+  )
+  
+  # Followup m6 Fasting blood sugar
+  output$fbs6 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","fasting_bloodsugar_clinc", "fasting_bloodsugar_lab")
+    
+    dt <- lab_qc_fu6()%>%
+      filter(as.double(fasting_bloodsugar_clinc) != as.double(fasting_bloodsugar_lab) |
+             is.na(fasting_bloodsugar_clinc) | is.na(fasting_bloodsugar_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_fbs6 = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fbs6'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  #Doownload button handler
+  output$download_fbs6 <- downloadHandler(
+    
+    filename = function() {
+      paste("fsb_data_m6_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_fbs6, file)
+    }
+  )
+  
+  # Follow-up m6 Fasting total cholesterol
+  output$tchol6 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","total_cholesterol_clinic",
+                   "total_cholesterol_lab")
+    
+    dt <- lab_qc_fu6()%>%
+      filter(as.double(total_cholesterol_clinic) != as.double(total_cholesterol_lab) |
+               is.na(total_cholesterol_clinic) | is.na(total_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_ftchol6 = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_ftchol6'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_ftchol6 <- downloadHandler(
+    
+    filename = function() {
+      paste("ftchol_data_m6_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_ftchol6, file)
+    }
+  )
+  
+  # Follow-up m6 Fasting HDL cholesterol
+  output$hdlchol6 <- DT::renderDataTable({
+    col_order <- c("studyid","gender", "vdate","daterequested","HDL_cholesterol_clinic", "HDL_cholesterol_lab")
+    
+    dt <- lab_qc_fu6()%>%
+      filter(as.double(HDL_cholesterol_clinic) != as.double(HDL_cholesterol_lab) |
+               is.na(HDL_cholesterol_clinic) | is.na(HDL_cholesterol_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_fhdlchol6 = dt
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_fhdlchol6'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_fhdlchol6 <- downloadHandler(
+    
+    filename = function() {
+      paste("fhdlchol_data_m6_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_fhdlchol6, file)
+    }
+  )
+  
+  # Follow-up m6 Fasting Triglycerides
+  output$ftrig6 <- DT::renderDataTable({
+    col_order <- c("studyid","gender",  "vdate","daterequested","Triglycerides_clinic",
+                   "Triglycerides_lab")
+    
+    dt <- lab_qc_fu6()%>%
+      filter(as.double(Triglycerides_clinic) != as.double(Triglycerides_lab) |
+               is.na(Triglycerides_clinic) | is.na(Triglycerides_lab))
+    
+    dt <- dt[, col_order]
+    df_download$df_data_ftrig6 = dt # add this to reactive df
+    #add functionality to the download button
+    datatable(dt,
+              callback = JS("$('div.dwnld').append($('#download_trigchol6'));"),
+              extensions = 'Buttons')
+    
+  })
+  
+  output$download_trigchol6 <- downloadHandler(
+    
+    filename = function() {
+      paste("trigchol_data_m6_", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(df_download$df_data_ftrig6, file)
+    }
+  )
+  
+  #-----------------------------------------------------------------------------
+  # DTG ENDPOINT Ascertainment
+  #-----------------------------------------------------------------------------
+  
+  df_endpoint <- reactive({
+    ret_val <- df_followup %>%
+      filter(as.numeric(fuvnumber)== 6) %>%
+      select(studyid, vdate_0, clinicid, weight_change, bmi, hyp_status_1, 
+             chol_status_1, diab_status_1, f_glucose,f_total_chol, f_hdl_chol, 
+             f_trig, hgb) %>%
+      mutate(endpoint_started = 1,
+             endpoint_complete = ifelse(!is.na(f_glucose) & as.double(f_glucose) != -6.00 &
+                                          !is.na(f_total_chol) & as.double(f_total_chol) != -6.00 &
+                                          !is.na(f_hdl_chol) & as.double(f_hdl_chol) != -6.00 &
+                                          !is.na(f_trig) & as.double(f_trig) != -6.00 &
+                                          !is.na(hgb) & as.double(hgb) != -6.00, 1, 0))
+  })
+  
+  
+  in_endpoint_window_df <- reactive({
+    
+    df_temp_ep <- enrollment_data() %>% 
+      
+      mutate(endpoint_start = enrdate_0 + (365 / 2) - 15, 
+             endpoint_end = enrdate_0 + (365 / 2) + 15) %>% 
+      
+      select(studyid, enrdate_0, 
+             endpoint_start, endpoint_end, 
+             gender) %>% 
+      
+      merge(df_endpoint(), 
+            by = "studyid", 
+            all.x = T) 
+      #print(df_temp_ep)
+  })
+  
+  output$in_window <- renderUI({
+    
+    in_window_ct <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date()  >=  endpoint_start ) %>%
+      nrow()
+    
+    HTML(paste("<font size='4'>", sprintf("There are %s participants currently in their endpoint window",
+                                          in_window_ct),"</font><br><br>"))
+  })
+  
+  output$in_window_progress <- renderUI({
+    
+    in_window_ct <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >=  endpoint_start ) %>%
+      nrow()
+    
+    in_window_complete <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >=  endpoint_start ) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1) %>%
+      
+      nrow()
+    
+    if (in_window_ct){
+      progressBar(
+        id = "pb1",
+        value = in_window_complete,
+        total = in_window_ct,
+        title = "Endpoint Ascertainment Progress",
+        display_pct = TRUE
+      )
+      #progressGroup('Endpoint Ascertainment Progress', in_window_complete, 0, in_window_ct)
+    }
+    else{
+      #progressGroup('Endpoint Ascertainment Progress', 0, 0, 1, custom_text = "0 / 0")
+      progressBar(
+        id = "pb1",
+        value = 0,
+        total = 0,
+        title = "Endpoint Ascertainment Progress",
+        display_pct = TRUE
+      )
+    }
+  })
+  
+  #Hypertensive
+  output$in_window_hypertensive <- renderUI({
+    
+    in_window_ct <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1) %>%
+      
+      nrow()
+    
+    in_window_complete <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1 ) %>%
+      filter(hyp_status_1 == "Hypertensive") %>%
+      
+      nrow()
+    
+    if (in_window_ct){
+      progressBar(
+        id = "pb2",
+        value = in_window_complete,
+        total = in_window_ct,
+        title = "Endpoint Hypertension Status",
+        display_pct = TRUE
+      )
+      #progressGroup('Endpoint Ascertainment Progress', in_window_complete, 0, in_window_ct)
+    }
+    else{
+      #progressGroup('Endpoint Ascertainment Progress', 0, 0, 1, custom_text = "0 / 0")
+      progressBar(
+        id = "pb2",
+        value = 0,
+        total = 0,
+        title = "Endpoint Hypertension Status",
+        display_pct = TRUE
+      )
+    }
+  })
+  
+  
+  #Diabetic
+  output$in_window_diabetic <- renderUI({
+    
+    in_window_ct <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1) %>%
+      
+      nrow()
+    
+    in_window_complete <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1 ) %>%
+      filter(diab_status_1 == "Diabetic") %>%
+      
+      nrow()
+    
+    if (in_window_ct){
+      progressBar(
+        id = "pb3",
+        value = in_window_complete,
+        total = in_window_ct,
+        title = "Endpoint Diabetic Status",
+        display_pct = TRUE
+      )
+      #progressGroup('Endpoint Ascertainment Progress', in_window_complete, 0, in_window_ct)
+    }
+    else{
+      #progressGroup('Endpoint Ascertainment Progress', 0, 0, 1, custom_text = "0 / 0")
+      progressBar(
+        id = "pb3",
+        value = 0,
+        total = 0,
+        title = "Endpoint Diabetic Status",
+        display_pct = TRUE
+      )
+    }
+  })
+  
+  
+  #High Cholestrol
+  output$in_window_high_chol <- renderUI({
+    
+    in_window_ct <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start ) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1) %>%
+      
+      nrow()
+    
+    in_window_complete <- in_endpoint_window_df() %>% 
+      
+      filter(Sys.Date() >= endpoint_start ) %>%
+      
+      filter((!!sym(input$in_window_type)) == 1 ) %>%
+      filter(chol_status_1 == "High Cholesterol") %>%
+      
+      nrow()
+    
+    if (in_window_ct){
+      progressBar(
+        id = "pb4",
+        value = in_window_complete,
+        total = in_window_ct,
+        title = "Endpoint High Cholesterol Status",
+        display_pct = TRUE
+      )
+      #progressGroup('Endpoint Ascertainment Progress', in_window_complete, 0, in_window_ct)
+    }
+    else{
+      #progressGroup('Endpoint Ascertainment Progress', 0, 0, 1, custom_text = "0 / 0")
+      progressBar(
+        id = "pb4",
+        value = 0,
+        total = 0,
+        title = "Endpoint High Cholesterol Status",
+        display_pct = TRUE
+      )
+    }
+  })
+  
+  ep_ind_df <- reactive({
+    df_withdraw_filtered <- df_withdraw %>% 
+      mutate(Withdrawn = 1) %>% 
+      select(studyid, Withdrawn) 
+    
+    vars_to_include <- c("studyid", 
+                         "gender", 
+                         "Enrollment Date",
+                         "Endpoint End",
+                         "Status", 
+                         input$ep_vars_to_include)
+    
+    in_endpoint_window_df() %>% 
+      
+      mutate(`Status` = ifelse(Sys.Date() >= endpoint_start & 
+                                 Sys.Date() <= endpoint_end, "In Endpoint Window", "Hasn't Reached Endpoint Window"),
+             endpointdoc = ifelse(!is.na(endpoint_complete) & 
+                                    endpoint_complete == 1, "Yes", "No"), 
+             started_endpoint = ifelse(!is.na(endpoint_started) & endpoint_started == 1, "Yes", "No")) %>% 
+      
+      merge(df_withdraw_filtered, by="studyid", all.x = T) %>%
+      
+      rename(`Endpoint Ascertained` = endpointdoc, 
+             `Endpoint End` = endpoint_end, 
+             `Endpoint Started` = started_endpoint,
+             `Enrollment Date` =  enrdate_0) %>% 
+      
+      mutate(Status = factor(Status), 
+             `Endpoint Ascertained` = factor(`Endpoint Ascertained`), 
+             `Endpoint Started` = factor(`Endpoint Started`), 
+             Withdrawn = ifelse(is.na(Withdrawn), "No", "Yes")) %>% 
+      select(any_of(vars_to_include))
+  })
+  
+  output$ep_ind_line_list <- DT::renderDataTable({
+    df_return <- ep_ind_df()
+    
+    if (nrow(df_return) > 0){
+      
+      # add the View Patient Details button if there are rows to show
+      df_return[["Details"]] = 
+        paste0('
+               <div class="btn-group" role="group" aria-label="Basic example">
+               <button type="button" class="btn btn-secondary delete" id=view_',df_return$studyid,'>View Details</button>
+               </div>
+               ')
+    }
+    
+    # render datatable 
+    datatable(df_return,
+              escape=F, selection = 'none',  filter = 'top',
+              options = 
+                list(language = list(
+                  search = 'Find in table:',
+                  dom = 't')), rownames = FALSE)
+  })
+  
+  output$download_ep_line_list <- downloadHandler(
+    filename = function(){
+      'endpoint_line_list.csv'
+    },
+    content = function(con){
+      write.csv(ep_ind_df()[input[['ep_ind_line_list_rows_all']],], con, row.names = FALSE)
+    }
+  )
+  
+  
+  observeEvent(input$lastClick,
+               {
+                 # if you click on "View Details" options
+                 if (grepl('view', input$lastClickId)){
+                   studyid_select(gsub("view_", "", input$lastClickId, fixed = TRUE))
+                   showModal(patient_details_modal())
+                 }
+                
+               }
+  ) 
+  
+  # -------------------------------------------
+  # ENDPOINT STATUS SPREADSHEET  
+  # -------------------------------------------
+  
+  endpoint_status_temp <- reactive({
+    df_final <- in_endpoint_window_df() %>%
+      merge(screening_data()[,c("studyid", "age")], by="studyid", all.x=T)%>%
+      distinct(studyid, .keep_all = T) %>%
+      mutate(window_status = case_when(Sys.Date() < endpoint_start ~ "Hasn't reach endpoint window", 
+                                       Sys.Date() >= endpoint_start & 
+                                         Sys.Date() <= endpoint_end ~ "In endpoint window", 
+                                       Sys.Date() >= endpoint_end & 
+                                         Sys.Date() <= endpoint_end + 30 ~ "In extended window", 
+                                       TRUE ~ "Past endpoint window"),
+             endpointdoc = ifelse(!is.na(endpoint_complete) & 
+                                    endpoint_complete == 1, "Yes", "No"), 
+             started_endpoint = ifelse(!is.na(endpoint_started) & endpoint_started == 1, "Yes", "No"),
+             `Age Group` = ifelse(age <=35, "25 - 35 Years", 
+                                  ifelse(age <=45,"36 - 45 Years", "Greater than 45 Years"))) %>%
+      group_by(`Age Group`) %>%
+      summarise(`Total Enrolled` = n(),
+                `Endpoint Open` = sum(is.na(window_status) | window_status != "Hasn't reach endpoint window", na.rm = T),
+                started = sum(started_endpoint == "Yes", na.rm = T),
+                completed =  sum(endpointdoc == "Yes", na.rm = T),
+                `Endpoint Determined (Started - In window)` = sprintf("%d / %d (%.1f%%)",started,`Endpoint Open`,started/`Endpoint Open`*100),
+                `Endpoint Determined (Completed - In window)` = sprintf("%d / %d (%.1f%%)",completed,`Endpoint Open`,completed/`Endpoint Open`*100),
+                `Endpoint Determined (Started - Overall)` = sprintf("%d / %d (%.1f%%)",started,n(),started/n()*100),
+                `Endpoint Determined (Completed - Overall)` = sprintf("%d / %d (%.1f%%)",completed,n(),completed/n()*100)
+                ) %>%
+      select(!c(started,completed))
+    
+    
+    df_final2 <- in_endpoint_window_df() %>%
+      merge(screening_data()[,c("studyid", "age")], by="studyid", all.x=T)%>%
+      distinct(studyid, .keep_all = T) %>%
+      mutate(window_status = case_when(Sys.Date() < endpoint_start ~ "Hasn't reach endpoint window", 
+                                       Sys.Date() >= endpoint_start & 
+                                         Sys.Date() <= endpoint_end ~ "In endpoint window", 
+                                       Sys.Date() >= endpoint_end & 
+                                         Sys.Date() <= endpoint_end + 30 ~ "In extended window", 
+                                       TRUE ~ "Past endpoint window"),
+             endpointdoc = ifelse(!is.na(endpoint_complete) & 
+                                    endpoint_complete == 1, "Yes", "No"), 
+             started_endpoint = ifelse(!is.na(endpoint_started) & endpoint_started == 1, "Yes", "No"),
+             `Age Group` = ifelse(age <=35, "25 - 35 Years", 
+                                  ifelse(age <=45,"36 - 45 Years", "Greater than 45 Years"))) %>%
+      
+      summarise(`Total Enrolled` = n(),
+                `Endpoint Open` = sum(is.na(window_status) | window_status != "Hasn't reach endpoint window", na.rm = T),
+                started = sum(started_endpoint == "Yes", na.rm = T),
+                completed =  sum(endpointdoc == "Yes", na.rm = T),
+                `Endpoint Determined (Started - In window)` = sprintf("%d / %d (%.1f%%)",started,`Endpoint Open`,started/`Endpoint Open`*100),
+                `Endpoint Determined (Completed - In window)` = sprintf("%d / %d (%.1f%%)",completed,`Endpoint Open`,completed/`Endpoint Open`*100),
+                `Endpoint Determined (Started - Overall)` = sprintf("%d / %d (%.1f%%)",started,n(),started/n()*100),
+                `Endpoint Determined (Completed - Overall)` = sprintf("%d / %d (%.1f%%)",completed,n(),completed/n()*100)
+      ) %>%
+      select(!c(started,completed))
+    
+    df_final2 = df_final2 %>%
+      mutate(`Age Group` = "Total")
+    
+    df_final = df_final %>%
+      rbind(df_final2)
+  })
+  
+  
+  
+  output$ep_summary_table <- renderTable({
+    
+    endpoint_status_temp() 
+    
+  })
+  
+  output$download_ep_summary_ss <- downloadHandler(
+    filename = function(){
+      'dtg_ep_summary.csv'
+    },
+    content = function(con){
+      write.csv(endpoint_status_temp(), con, row.names = FALSE, na = "")
+    }
+  )
+  
 }
